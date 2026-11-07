@@ -1,8 +1,8 @@
-# SidewalkAI
+# FixItSanDiego
 
 Photograph a sidewalk, curb, or street-surface hazard. Gemini drafts a qualified description, you confirm the location, and the app prepares an editable report. You then submit it yourself on the official site: **UCSD Facilities "Report It Now"** or **City of San Diego "Get It Done"**.
 
-> SidewalkAI is **not** an official reporting channel, an engineering inspection, or an emergency service. If someone is in immediate danger, call **911**.
+> FixItSanDiego is **not** an official reporting channel, an engineering inspection, or an emergency service. If someone is in immediate danger, call **911**.
 
 ## Setup (local)
 
@@ -40,7 +40,7 @@ pytest -q        # requires: pip install pytest
 
 ## Design decisions
 
-- **Gemini only observes.** It never supplies coordinates, costs, durations, or priorities. It returns observation flags (`apparent_immediate_danger`, `possible_trip_or_access_obstacle`, `minor_or_cosmetic`). `report.suggest_urgency()` maps them to a provisional level in this order: unusable or uncertain photo → `uncertain`; no visible issue → `uncertain`; danger → **P0**; trip or access obstacle → **P1**; cosmetic → **P3**; otherwise **P2**. These are SidewalkAI suggestions, not official priorities, and the user can edit them.
+- **Gemini only observes.** It never supplies coordinates, costs, durations, or priorities. It returns observation flags (`apparent_immediate_danger`, `possible_trip_or_access_obstacle`, `minor_or_cosmetic`). `report.suggest_urgency()` maps them to a provisional level in this order: unusable or uncertain photo → `uncertain`; no visible issue → `uncertain`; danger → **P0**; trip or access obstacle → **P1**; cosmetic → **P3**; otherwise **P2**. These are FixItSanDiego suggestions, not official priorities, and the user can edit them.
 - **Cost and repair time are always `unavailable`** (null amounts). The schema accepts a "preliminary" estimate only with a complete, non-negative, ordered range, a stated basis, and an http(s) source URL.
 - **Status is `draft` or `ready_for_manual_submission` only.** The value `submitted` cannot pass validation. "Ready" requires a detected issue type (not `no_visible_issue` or `uncertain`), a user-confirmed non-demo location, and a chosen destination.
 - **Gemini is called only when Analyze is clicked.** Reruns reuse the stored result, a new photo clears the old analysis, and each session is capped at 15 analyses.
