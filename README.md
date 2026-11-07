@@ -1,8 +1,8 @@
-# 🚧 FixMySanDiego
+# FixMySanDiego
 
 **Photograph a broken sidewalk, curb, or pothole and get a ready-to-file repair report in under a minute.**
 
-### 🌐 Live demo: **[aic-hackathon.onrender.com](https://aic-hackathon.onrender.com/)**
+### Live demo: **[aic-hackathon.onrender.com](https://aic-hackathon.onrender.com/)**
 
 > Hosted on Render's free tier, so the first visit after a quiet period can take about 30 seconds while the server wakes up. Works on phones too; use the rear camera and "Use my location" there.
 
@@ -38,7 +38,7 @@ FixMySanDiego turns one photo into a structured, editable report in five steps. 
 
 It's a non-emergency tool. A P0 result shows a prominent 911 warning.
 
-## 🛠 Features
+## Features
 
 - **Camera or upload**: opens the phone's rear camera. Photos are validated, downscaled, and stripped of embedded EXIF/GPS metadata before analysis.
 - **Gemini vision with structured output**: a Pydantic schema keeps the response shape fixed, the output is re-validated, and an automatic fallback model is used if the first one times out.
