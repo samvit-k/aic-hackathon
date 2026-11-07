@@ -11,7 +11,11 @@ import folium
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ai_analysis import get_setting
+from geocoding import GeocodeError, QueryError, search_places
 from report import LocationInfo
+
+MAX_SEARCHES_PER_SESSION = 20
 
 try:
     from streamlit_geolocation import streamlit_geolocation
@@ -29,9 +33,13 @@ _DEFAULTS = {
     "loc_lon": None,
     "loc_accuracy": None,
     "loc_source": None,
+    "loc_address": None,
     "location_confirmed": False,
     "last_gps_fix": None,
     "last_map_click": None,
+    "search_results": None,
+    "search_error": None,
+    "search_count": 0,
 }
 
 
@@ -47,13 +55,22 @@ def valid_coords(lat: Optional[float], lon: Optional[float]) -> bool:
     )
 
 
-def _set_pin(lat: float, lon: float, source: str, accuracy: Optional[float] = None) -> None:
+def _set_pin(
+    lat: float,
+    lon: float,
+    source: str,
+    accuracy: Optional[float] = None,
+    address: Optional[str] = None,
+    keep_address: bool = False,
+) -> None:
     """Only call before the coordinate widgets render (or from a callback)."""
     ss = st.session_state
     ss.loc_lat = round(float(lat), 6)
     ss.loc_lon = round(float(lon), 6)
     ss.loc_source = source
     ss.loc_accuracy = accuracy
+    if not keep_address:  # a map-tap refinement keeps the searched place as context
+        ss.loc_address = address
     ss.location_confirmed = False  # any move requires re-confirmation
 
 
@@ -61,6 +78,7 @@ def _on_manual_change() -> None:
     ss = st.session_state
     ss.loc_source = "manual"
     ss.loc_accuracy = None
+    ss.loc_address = None
     ss.location_confirmed = False
 
 
@@ -70,8 +88,74 @@ def _use_demo() -> None:
 
 def _clear() -> None:
     ss = st.session_state
-    ss.loc_lat = ss.loc_lon = ss.loc_accuracy = ss.loc_source = None
+    ss.loc_lat = ss.loc_lon = ss.loc_accuracy = ss.loc_source = ss.loc_address = None
     ss.location_confirmed = False
+
+
+def _search_enabled() -> bool:
+    value = (get_setting("GEOCODER_ENABLED", "true") or "true").strip().lower()
+    return value not in ("false", "0", "no", "off")
+
+
+def _use_search_result() -> None:
+    ss = st.session_state
+    results = ss.search_results or []
+    idx = ss.get("search_choice")
+    if isinstance(idx, int) and 0 <= idx < len(results):
+        r = results[idx]
+        _set_pin(r["lat"], r["lon"], source="search", address=r["label"])
+
+
+def _search_section() -> None:
+    ss = st.session_state
+    st.markdown("**Search for a place or address**")
+    if not _search_enabled():
+        st.caption("Place search is turned off. Use GPS, the map, or coordinates.")
+        return
+    with st.form("place_search", border=False):
+        query = st.text_input(
+            "Place or address",
+            key="search_query",
+            max_chars=200,
+            placeholder="e.g. Outside Geisel Library at UCSD, or 9500 Gilman Dr",
+        )
+        submitted = st.form_submit_button("Search", width="stretch")
+    if submitted:  # one lookup per explicit submit — no autocomplete
+        ss.search_results, ss.search_error = None, None
+        if not (query or "").strip():
+            ss.search_error = "Enter a place or address to search."
+        elif ss.search_count >= MAX_SEARCHES_PER_SESSION:
+            ss.search_error = "Search limit for this session reached. Use the map or coordinates."
+        else:
+            ss.search_count += 1
+            try:
+                with st.spinner("Searching OpenStreetMap…"):
+                    places = search_places(query, user_agent=get_setting("NOMINATIM_USER_AGENT"))
+                ss.search_results = [p._asdict() for p in places]
+                ss.search_choice = 0
+            except QueryError as exc:
+                ss.search_error = str(exc)
+            except GeocodeError:
+                ss.search_error = ("Location search is temporarily unavailable — use GPS, "
+                                   "the map, or coordinates.")
+
+    if ss.search_error:
+        st.warning(ss.search_error)
+    elif ss.search_results is not None:
+        results = ss.search_results
+        if not results:
+            st.info("No match found. Try a nearby landmark or street address, or tap the map.")
+        else:
+            if len(results) > 1:
+                st.caption(f"{len(results)} possible matches — pick the right one.")
+            st.radio("Matches", list(range(len(results))), key="search_choice",
+                     format_func=lambda i: results[i]["label"], label_visibility="collapsed")
+            st.button("Use this place", on_click=_use_search_result, width="stretch",
+                      type="primary")
+            st.caption("The pin goes to the matched place. Tap the map to move it onto the "
+                       "exact defect, then confirm below.")
+    st.caption("Search results © OpenStreetMap contributors (ODbL), via Nominatim. "
+               "Don't include names or personal details.")
 
 
 def _gps_section() -> None:
@@ -128,13 +212,14 @@ def _map_section() -> None:
         key = (click["lat"], click["lng"])
         if key != ss.last_map_click:  # only react to a genuinely new click
             ss.last_map_click = key
-            _set_pin(click["lat"], click["lng"], source="map_click")
+            _set_pin(click["lat"], click["lng"], source="map_click", keep_address=True)
             st.rerun()
 
 
 def render_location_picker() -> LocationInfo:
     init_state()
     ss = st.session_state
+    _search_section()
     _gps_section()
     _map_section()
 
@@ -158,11 +243,14 @@ def render_location_picker() -> LocationInfo:
         source_label = {
             "gps": "device GPS (your position — move the pin if the defect is elsewhere)",
             "map_click": "map tap",
+            "search": "place search (OpenStreetMap) — tap the map to refine",
             "manual": "typed coordinates",
             "demo_test_coordinate": "DEMO TEST COORDINATE — not a real location",
         }.get(ss.loc_source, "unknown")
         acc = f" · accuracy ±{ss.loc_accuracy:.0f} m" if ss.loc_accuracy else ""
         st.caption(f"Pin: {ss.loc_lat:.6f}, {ss.loc_lon:.6f} · source: {source_label}{acc}")
+        if ss.loc_address:
+            st.caption(f"Near: {ss.loc_address}")
         if ss.loc_source == "demo_test_coordinate":
             st.warning("Demo coordinate in use. Replace it with the real location before reporting.")
     else:
@@ -179,5 +267,6 @@ def render_location_picker() -> LocationInfo:
         longitude=ss.loc_lon,
         accuracy_meters=ss.loc_accuracy,
         source=ss.loc_source,
+        address=ss.loc_address,
         user_confirmed=bool(ss.location_confirmed),
     )
