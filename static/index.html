@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FixItSanDiego – Report a sidewalk or street problem</title>
+  <meta name="description" content="Photograph a sidewalk, curb or street-surface problem, get an AI-drafted report, confirm the location, and hand it off to UCSD or the City of San Diego.">
+  <meta name="theme-color" content="#1f1f1f">
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;700;800&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body data-step="1">
+  <a class="skiplink" href="#sidebar">Skip to main content</a>
+
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="FixItSanDiego – start over">
+      <svg class="brand__icon" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 1.5C9.6 1.5 4.5 6.6 4.5 12.9 4.5 21.6 16 30.5 16 30.5s11.5-8.9 11.5-17.6C27.5 6.6 22.4 1.5 16 1.5z" fill="#FFD000"/>
+        <path d="M10.8 13.2l3.6 3.6 7-7.1" fill="none" stroke="#1f1f1f" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="brand__word"><span class="brand__light">FixIt</span><span class="brand__bold">SanDiego</span></span>
+    </a>
+  </header>
+
+  <div class="layout">
+    <main class="sidebar" id="sidebar" tabindex="-1">
+      <div class="sidebar__back">
+        <button type="button" class="back is-hidden" id="back-btn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3 6.5 12l9 9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Back
+        </button>
+      </div>
+
+      <div class="sidebar__body" id="sidebar-body">
+        <p class="notice-emergency"><strong>Not an emergency service.</strong> If anyone is in immediate danger, call <a href="tel:911">911</a>.</p>
+        <p class="stepcount" id="step-count">Step 1 of 5</p>
+        <h1 id="step-title" tabindex="-1">Add a photo</h1>
+        <div class="alert alert--error" id="fatal-error" hidden></div>
+
+        <!-- Step 1: photo -->
+        <section class="step" data-step="1" aria-labelledby="step-title">
+          <p class="lead">Photograph a sidewalk, curb, pothole or street-surface problem. You'll confirm where it is in a later step.</p>
+          <div class="stack">
+            <button type="button" class="btn btn--secondary btn--block" id="pick-camera">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+              Take a photo
+            </button>
+            <button type="button" class="btn btn--secondary btn--block" id="pick-upload">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Upload a photo
+            </button>
+          </div>
+          <input type="file" id="photo-camera" class="visually-hidden" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
+          <input type="file" id="photo-upload" class="visually-hidden" accept="image/jpeg,image/png,image/webp" tabindex="-1" aria-hidden="true">
+          <p class="form-hint">JPEG, PNG or WebP, up to 10 MB. Location data embedded in the photo is removed before analysis.</p>
+          <div class="alert alert--error" id="photo-error" hidden></div>
+          <figure class="preview" id="photo-preview" hidden>
+            <img id="photo-img" alt="Selected photo of the problem">
+            <figcaption class="form-hint" id="photo-caption"></figcaption>
+          </figure>
+          <div class="tips" aria-label="Tips for useful photos">
+            <ul class="tips__do">
+              <li>Include a close-up and a wider shot of the area</li>
+              <li>Shoot in good light and hold the phone steady</li>
+            </ul>
+            <ul class="tips__dont">
+              <li>Avoid faces and licence plates</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Step 2: analysis -->
+        <section class="step" data-step="2" hidden>
+          <p class="lead">Gemini describes only what is visible. You can edit everything before you report it.</p>
+          <img class="thumb" id="analyze-thumb" alt="Photo to analyze">
+          <button type="button" class="btn btn--dark btn--block" id="analyze-btn">Analyze photo</button>
+          <p class="spinner-row" id="analyze-spinner" hidden><span class="spinner" aria-hidden="true"></span> Gemini is examining the photo…</p>
+          <div class="alert alert--error" id="analyze-error" role="alert" hidden></div>
+          <div id="analysis-result" hidden>
+            <div class="alert" id="analysis-banner"></div>
+            <dl class="facts">
+              <dt>Issue type</dt><dd id="r-type"></dd>
+              <dt>What's visible</dt><dd id="r-desc"></dd>
+              <dt>Visible evidence</dt><dd><ul id="r-evidence"></ul></dd>
+              <dt>Possible root causes <span class="tag">unverified</span></dt><dd><ul id="r-causes"></ul></dd>
+              <dt>Photo quality</dt><dd id="r-quality"></dd>
+            </dl>
+            <p class="form-hint" id="r-model"></p>
+          </div>
+        </section>
+
+        <!-- Step 3: location -->
+        <section class="step" data-step="3" hidden>
+          <ul class="change-location">
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m0 0-6-6m6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Click the map or drag the pin to adjust the location</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span>Or <button type="button" class="linkbtn" id="focus-search">search for a place or address</button></span>
+            </li>
+          </ul>
+
+          <form id="search-form" class="search" role="search" autocomplete="off">
+            <label class="field" for="search-input">Place or address</label>
+            <div class="search__row">
+              <input type="search" id="search-input" maxlength="200" placeholder="e.g. Outside Geisel Library at UCSD">
+              <button type="submit" class="btn btn--dark" id="search-btn">Search</button>
+            </div>
+            <p class="form-hint">Results © OpenStreetMap contributors (ODbL), via Nominatim. Don't include names or personal details.</p>
+          </form>
+          <p class="form-hint" id="search-off" hidden>Place search is turned off. Use GPS, the map, or coordinates.</p>
+          <div class="alert" id="search-status" role="status" hidden></div>
+          <fieldset class="radios" id="search-results" hidden>
+            <legend id="search-legend">Matches</legend>
+            <div id="search-options"></div>
+            <button type="button" class="btn btn--secondary btn--block" id="use-place-btn">Use this place</button>
+          </fieldset>
+
+          <div class="divider"><span>or</span></div>
+          <button type="button" class="btn btn--secondary btn--block" id="gps-btn">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Use my location
+          </button>
+          <p class="form-hint">Asks your browser once. Your position isn't tracked or stored.</p>
+          <div class="alert" id="gps-status" role="status" hidden></div>
+
+          <details class="manual">
+            <summary>Enter coordinates</summary>
+            <div class="coords">
+              <label class="field">Latitude
+                <input type="number" id="lat-input" step="0.000001" min="-90" max="90" inputmode="decimal" placeholder="32.8801">
+              </label>
+              <label class="field">Longitude
+                <input type="number" id="lon-input" step="0.000001" min="-180" max="180" inputmode="decimal" placeholder="-117.2340">
+              </label>
+            </div>
+            <div class="alert alert--warning" id="coords-error" hidden></div>
+            <div class="row">
+              <button type="button" class="btn btn--small btn--secondary" id="demo-btn">Use demo test coordinate</button>
+              <button type="button" class="btn btn--small btn--secondary" id="clear-btn">Clear location</button>
+            </div>
+          </details>
+
+          <div class="pin-summary" id="pin-summary" aria-live="polite"></div>
+          <div class="alert alert--warning" id="demo-warning" hidden>Demo coordinate in use. Replace it with the real location before reporting.</div>
+          <label class="checkbox">
+            <input type="checkbox" id="confirm-loc" disabled>
+            <span>Confirm this is the issue location</span>
+          </label>
+          <p class="form-hint">GPS shows where <em>you</em> are. Make sure the pin marks the defect itself.</p>
+        </section>
+
+        <!-- Step 4: review -->
+        <section class="step" data-step="4" hidden>
+          <h2 class="section">1. Problem explanation and possible root causes</h2>
+          <fieldset class="radios radios--compact">
+            <legend>Issue type</legend>
+            <div id="type-options"></div>
+          </fieldset>
+          <label class="field" for="desc-input">Observed problem</label>
+          <p class="form-hint">What is visible, e.g. "Raised sidewalk slab across the walkway next to the bus stop".</p>
+          <textarea id="desc-input" rows="4"></textarea>
+          <label class="field" for="evidence-input">Visible evidence <span class="field__note">(one per line)</span></label>
+          <textarea id="evidence-input" rows="3"></textarea>
+          <label class="field" for="causes-input">Possible root causes <span class="field__note">(unverified hypotheses, one per line, max 3)</span></label>
+          <textarea id="causes-input" rows="3"></textarea>
+          <p class="form-hint" id="causes-warning" hidden>Only the first three root causes are kept.</p>
+          <p class="form-hint" id="quality-note"></p>
+
+          <h2 class="section">2. Estimated repair cost</h2>
+          <div class="alert alert--info" id="cost-text"></div>
+          <p class="form-hint">A photo can't establish measurements, materials or crew scope, so no price is shown.</p>
+
+          <h2 class="section">3. Urgency / priority (provisional)</h2>
+          <p class="form-hint" id="urgency-suggestion"></p>
+          <label class="field" for="urgency-select">Urgency</label>
+          <select id="urgency-select"></select>
+          <p id="urgency-reason" class="reason"></p>
+          <div class="alert alert--danger" id="p0-banner" hidden><strong>Possible immediate danger.</strong> FixItSanDiego is not an emergency tool and routine reporting may not be enough. If anyone is at risk, call <a href="tel:911">911</a>. For urgent campus hazards contact UCSD Facilities; for urgent street hazards contact the City.</div>
+          <div class="alert alert--warning" id="p1-banner" hidden>Possible significant trip or accessibility obstacle — consider flagging it as a high concern when you submit.</div>
+          <div class="alert alert--info" id="uncertain-banner" hidden>Not enough evidence for a priority. Retake the photo or set the details yourself.</div>
+          <p class="form-hint">Human review required: <strong>yes</strong></p>
+
+          <h2 class="section">4. Estimated repair time</h2>
+          <p><strong>Active hands-on repair duration:</strong> <span id="active-time">unavailable</span></p>
+          <p><strong>Agency resolution / scheduling time:</strong> <span id="agency-time">unavailable</span></p>
+          <p class="form-hint">No reliable basis for a duration estimate from a single photo. Scheduling depends on the agency's workload.</p>
+
+          <h2 class="section">Where should this be reported?</h2>
+          <fieldset class="radios">
+            <legend>Who maintains this location?</legend>
+            <label class="radio"><input type="radio" name="destination" value="ucsd"><span>UC San Diego campus property</span></label>
+            <label class="radio"><input type="radio" name="destination" value="city"><span>City of San Diego street or sidewalk</span></label>
+            <label class="radio"><input type="radio" name="destination" value="unsure"><span>Not sure — show both</span></label>
+          </fieldset>
+          <p class="box-warning">GPS alone can't tell who owns a sidewalk. UCSD maintains campus property; the City maintains public streets and sidewalks.</p>
+          <div class="alert alert--error" id="report-error" role="alert" hidden></div>
+        </section>
+
+        <!-- Step 5: export + handoff -->
+        <section class="step" data-step="5" hidden>
+          <div class="alert" id="status-banner" role="status"></div>
+          <h2 class="section">Report text</h2>
+          <p class="form-hint">Copy this and paste it into the official form.</p>
+          <pre class="report-text" id="report-text" tabindex="0"></pre>
+          <button type="button" class="btn btn--dark btn--block" id="copy-btn">Copy report text</button>
+          <p class="form-hint" id="copy-status" role="status"></p>
+          <div class="row row--3">
+            <button type="button" class="btn btn--small btn--secondary" id="dl-json">Download JSON</button>
+            <button type="button" class="btn btn--small btn--secondary" id="dl-txt">Download text</button>
+            <button type="button" class="btn btn--small btn--secondary" id="dl-photo">Download photo</button>
+          </div>
+
+          <h2 class="section">Open the official reporting site</h2>
+          <div class="alert alert--info" id="nodamage-note" hidden>No damage is identified in this draft. If you do see a problem, go back and change the issue type before reporting.</div>
+          <p class="form-hint" id="jurisdiction-note" hidden>Check who maintains this spot before submitting: UCSD for campus property, the City for public streets and sidewalks.</p>
+          <div class="stack" id="dest-links"></div>
+          <p class="form-hint" id="category-hint" hidden>On Get It Done, change the report category (for example Pothole or Curb) if "Sidewalk" doesn't fit.</p>
+          <p class="box-warning">Opening the site does <strong>not</strong> submit anything. Paste the report text, upload the photo if asked, and complete the submission there. FixItSanDiego never marks a report as submitted and has no official case number.</p>
+        </section>
+      </div>
+
+      <div class="continue-bar">
+        <p class="continue-bar__hint" id="continue-hint" aria-live="polite"></p>
+        <button type="button" class="btn btn--primary btn--block" id="continue-btn" aria-describedby="continue-hint">Continue</button>
+      </div>
+    </main>
+
+    <section class="mapbox" id="mapbox" aria-label="Map">
+      <a class="skiplink" href="#continue-btn">Skip map</a>
+      <div id="map" aria-label="Map. Use the arrow keys to move, plus and minus to zoom, and Space to drop the pin."></div>
+      <div class="crosshair" aria-hidden="true"><span class="crosshair__dot"></span></div>
+      <div class="kbd-banner" id="kbd-banner" aria-live="polite">
+        <div class="kbd-state" data-kbd="idle">
+          <span>You can move around with your keyboard</span>
+          <span class="keys">
+            <span class="key" title="Zoom in">+</span><span class="key" title="Zoom out">−</span>
+            <span class="key" title="Move left">←</span><span class="key" title="Move right">→</span>
+          </span>
+        </div>
+        <div class="kbd-state" data-kbd="drop" hidden>
+          <span>Press Space to drop the pin at the crosshair</span>
+          <span class="key key--wide">space</span>
+        </div>
+        <div class="kbd-state" data-kbd="placed" hidden>
+          <span>Press Space again to adjust the location</span>
+          <span class="key key--wide">space</span>
+        </div>
+      </div>
+      <div class="mobile-map-bar" id="mobile-map-bar">
+        <p>Reposition if needed, then tap Continue</p>
+        <button type="button" class="btn btn--primary btn--block" id="mobile-place-btn">Place pin here</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/report-sync.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
