@@ -41,7 +41,7 @@ def jpeg(size=(60, 40)):
 
 def test_index_and_security_headers():
     r = client.get("/")
-    assert r.status_code == 200 and "FixItSanDiego" in r.text
+    assert r.status_code == 200 and "FixMySanDiego" in r.text
     assert "default-src 'self'" in r.headers["content-security-policy"]
     assert r.headers["x-content-type-options"] == "nosniff"
     assert client.get("/docs").status_code == 404
@@ -163,7 +163,7 @@ def test_report_draft_then_ready():
     assert r["status"] == "ready_for_manual_submission" and r["blocker"] is None
     assert "32.880000, -117.230000" in r["text"]
     assert r["report"]["location"]["latitude"] == 32.88
-    assert r["file_stem"] == "fixitsandiego-abc12345"
+    assert r["file_stem"] == "fixmysandiego-abc12345"
 
 
 def test_report_no_damage_never_ready():
