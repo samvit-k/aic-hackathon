@@ -2,6 +2,10 @@
 
 **Photograph a broken sidewalk, curb, or pothole and get a ready-to-file repair report in under a minute.**
 
+### 🌐 Live demo: **[aic-hackathon.onrender.com](https://aic-hackathon.onrender.com/)**
+
+> Hosted on Render's free tier, so the first visit after a quiet period can take about 30 seconds while the server wakes up. Works on phones too; use the rear camera and "Use my location" there.
+
 Built at **Hack for Humanity UCSD**, hosted by The AI Collective × DS3 (Nov 7, 2026, Price Center Theater).
 Main track: **AI for San Diego Impact (Civic life)**. Sponsor track: **Best Use of Gemini API**.
 
@@ -118,7 +122,11 @@ Open **http://localhost:8000**.
 pytest -q        # Python tests + frontend tests (Node.js)
 ```
 
-**Deploy (Render):** create a Blueprint from `render.yaml`, set `GEMINI_API_KEY` in the dashboard, and open the HTTPS URL on a phone. HTTPS is needed for the camera and GPS.
+**Deploy (Render):** the live app runs at **https://aic-hackathon.onrender.com/**. To deploy your own copy:
+1. Create a Render web service from this repo, or a Blueprint from `render.yaml`.
+2. Use the start command `uvicorn server:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"`.
+3. Set `GEMINI_API_KEY` in the dashboard.
+4. Open the HTTPS URL on a phone. HTTPS is needed for the camera and GPS.
 
 ## 🎤 Demo flow (about 3 minutes)
 
