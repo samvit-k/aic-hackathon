@@ -1,0 +1,25 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Create the service from this repo, then set GEMINI_API_KEY in the Render dashboard.
+services:
+  - type: web
+    name: fixitsandiego
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # --proxy-headers lets rate limits see the real client IP behind Render's proxy.
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.16
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-3.5-flash-lite
+      - key: GEOCODER_ENABLED
+        value: "true"
+      - key: NOMINATIM_USER_AGENT
+        sync: false
