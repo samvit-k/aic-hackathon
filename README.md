@@ -1,141 +1,183 @@
-# FixItSanDiego
+# 🚧 FixMySanDiego
 
-Photograph a sidewalk, curb, or street-surface hazard. Gemini drafts a qualified description, you confirm the location on a map, and the app prepares an editable report. You then submit it yourself on the official site: **UCSD Facilities "Report It Now"** or **City of San Diego "Get It Done"**.
+**Photograph a broken sidewalk, curb, or pothole and get a ready-to-file repair report in under a minute.**
 
-> FixItSanDiego is **not** an official reporting channel, an engineering inspection, or an emergency service. If someone is in immediate danger, call **911**.
+Built at **Hack for Humanity UCSD**, hosted by The AI Collective × DS3 (Nov 7, 2026, Price Center Theater).
+Main track: **AI for San Diego Impact (Civic life)**. Sponsor track: **Best Use of Gemini API**.
 
-## Architecture
+---
+
+## 🧩 Problem
+
+When a UCSD student or San Diego resident trips over a raised sidewalk slab or spots a pothole, reporting it is harder than it should be:
+
+- **Where do I report it?** UCSD Facilities' *Report It* covers campus property; the City's *Get It Done* covers public streets and sidewalks. People rarely know which applies.
+- **What do I write?** Reports like "hole in road" or "broken sidewalk" give crews little to work with, so someone has to go and look before the job can be scheduled.
+- **Where exactly is it?** Phone GPS shows where *you* are, not necessarily where the defect is.
+
+The City's own Get It Done sidewalk page estimates about **6 days for temporary mitigation** (such as ramping) and **8+ years for permanent repairs** ([source](https://getitdone.sandiego.gov/TSWNewReport?type=Sidewalk), checked Nov 7, 2026). Clear, well-located reports help that queue get triaged.
+
+## 💡 Solution
+
+FixMySanDiego turns one photo into a structured, editable report in five steps. You then submit it yourself on the official site.
+
+1. **Photo**: take one with your phone's rear camera, or upload one.
+2. **AI analysis**: Gemini describes only what is visible. It returns the issue type, a description, visible evidence, up to three *unverified* possible causes, and photo quality. It says "no visible issue" or "uncertain" rather than inventing damage.
+3. **Where is it?**: search a place in plain English ("Outside Geisel Library at UCSD"), use one-time GPS, click or drag the pin, or type coordinates. Then confirm the pin.
+4. **Review**: edit everything. The report has four sections: problem and possible causes, estimated repair cost, urgency (P0–P3), and estimated repair time.
+5. **Send it**: copy the report text, download JSON, text, or photo, and open **UCSD Report It** or **City Get It Done** to file it.
+
+**What it deliberately does *not* do:**
+- invent repair costs, durations, measurements, or ADA conclusions (those show as *unavailable*)
+- auto-submit to the City or UCSD
+- mark anything "submitted"
+
+It's a non-emergency tool. A P0 result shows a prominent 911 warning.
+
+## 🛠 Features
+
+- 📸 **Camera or upload**: opens the phone's rear camera. Photos are validated, downscaled, and stripped of embedded EXIF/GPS metadata before analysis.
+- 🧠 **Gemini vision with structured output**: a Pydantic schema keeps the response shape fixed, the output is re-validated, and an automatic fallback model is used if the first one times out.
+- 🚦 **Rule-based urgency**: Gemini reports only what it observes (apparent danger, trip or access obstacle, cosmetic wear). A fixed rule in Python maps that to **P0–P3**, and you can edit the result.
+- 🗺️ **Map-first location picker** (Leaflet + OpenStreetMap):
+  - click or drag the pin
+  - on-screen pan and zoom buttons
+  - **keyboard control**: arrow keys move, +/− zoom, Space drops the pin at the crosshair
+  - a full-screen map with crosshair on phones
+- 🔎 **Plain-English place search** (OpenStreetMap Nominatim), limited to San Diego County and compliant with Nominatim's usage policy: search on submit only, cached, rate limited.
+- ✏️ **Live, consistent report**: every edit rebuilds the report on the server. Copy, downloads, and Continue are disabled until the updated version arrives.
+- 🏛️ **Official handoff**: links to UCSD Report It and City Get It Done. When it's unclear who maintains a spot, the app shows both and tells you to check.
+- 🔒 **Privacy and safety**:
+  - no accounts or database; drafts stay in your browser tab
+  - search text and coordinates are never logged
+  - a strict Content-Security-Policy
+  - hourly limits per IP address
+
+## 🤖 What the AI did
+
+| Where | Model / agent | Role |
+|---|---|---|
+| **In the app (runtime)** | **Google Gemini API**: `gemini-3.6-flash`, falling back to `gemini-3.5-flash-lite` | Reads the photo and returns a validated JSON description: issue type, evidence, unverified causes, photo quality, hazard flags. It is never asked for location, cost, durations, or official priorities. |
+| **Building the app** | **Claude Code (Anthropic)** as the coding agent | Scaffolded and implemented the code, wrote the tests, and ran browser end-to-end checks. Each step was reviewed and directed by the team. |
+
+Models were chosen by testing what the team's API key could access on Nov 7, 2026. `gemini-3.8-flash` and `gemini-3.7-flash` timed out on Gemini's side. `gemini-3.6-flash` answered in about 4–8 s.
+
+## ⚙️ How it works
 
 ```
-Browser: static/index.html + app.css + app.js + report-sync.js
-         (Leaflet 1.9.4 from unpkg with SRI, OpenStreetMap tiles, no build step)
-   │  JSON / multipart
-FastAPI server.py ──► ai_analysis.py  (photo validation, Gemini structured output)
-                  ──► geocoding.py    (Nominatim place search, cached + rate limited)
-                  ──► report.py       (canonical report schema, urgency rubric, text export)
+Browser (static HTML/CSS/JS + Leaflet)
+   │  photo / edits / location
+FastAPI server (server.py)
+   ├── ai_analysis.py  → validate photo → Gemini structured output → sanitize
+   ├── geocoding.py    → Nominatim place search (cached, rate limited)
+   └── report.py       → canonical report: P0–P3 rule, cost/time = unavailable, status rules
 ```
 
-- The server keeps no drafts; the browser holds them. Gemini is called only by `POST /api/analyze`, when you tap **Analyze**.
-- Every report is built and validated in Python by `report.build_report()`, so the JSON, the text, and the status rules come from one place.
-- `static/report-sync.js` keeps the screen consistent with your edits. Any edit drops the previous report at once and disables Continue, Copy, the downloads, and the official-site buttons until the updated report arrives. Late responses can't overwrite newer edits.
+- **Gemini runs only when you tap Analyze.** Everything after that (rule-based urgency, report text, JSON) is plain Python.
+- **One builder for every report.** Each report is built and validated by `report.build_report()`, so the screen, the copied text, and the JSON always match.
+- **Status is only ever `draft` or `ready_for_manual_submission`.** "Ready" requires all of:
+  - a detected issue
+  - a confirmed, non-demo location
+  - a chosen destination
 
-| Route | Purpose |
-|---|---|
-| `GET /` | The app |
-| `GET /api/config` | Issue types, urgency levels, destinations, feature flags |
-| `POST /api/analyze` | Photo (multipart). Returns the validated analysis, suggested urgency, and the cleaned JPEG. |
-| `POST /api/geocode` | `{"q": "…"}`. Returns up to 5 OpenStreetMap matches. It's a POST so search text never appears in URLs or logs. |
-| `POST /api/report` | Analysis + edits + location + destination. Returns the report JSON, text, status, and what's blocking it. |
-| `GET /healthz` | Health check |
+## 🚀 Quick Start
 
-## Setup (local)
-
-Requires **Python 3.11+**. On this Mac the default `python3` is 3.9, so call 3.11 explicitly.
+Requires **Python 3.11+** and a Gemini API key from [Google AI Studio](https://aistudio.google.com/).
 
 ```bash
+# 1. Clone
+git clone https://github.com/samvit-k/aic-hackathon.git
+cd aic-hackathon
+
+# 2. Install
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
+
+# 3. Add your key (never commit this file)
+echo "GEMINI_API_KEY=your-key-here" > .env
+
+# 4. Run
+uvicorn server:app --host 127.0.0.1 --port 8000
 ```
 
-Put your key in `.env` (git-ignored):
+Open **http://localhost:8000**.
 
-```
-GEMINI_API_KEY=your-key
-# optional
-GEMINI_MODEL=gemini-3.6-flash
-GEMINI_FALLBACK_MODEL=gemini-3.5-flash-lite
-GEOCODER_ENABLED=true
-NOMINATIM_USER_AGENT=FixItSanDiego/0.1 (+https://your-site; contact@example.org)
-```
+**Optional settings in `.env`:**
+
+| Setting | Default | What it does |
+|---|---|---|
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Main analysis model |
+| `GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash-lite` | Used if the main model fails |
+| `GEOCODER_ENABLED` | `true` | Set to `false` to turn place search off |
+| `NOMINATIM_USER_AGENT` | built-in | Identifies the app to Nominatim; add contact details if you deploy publicly |
+
+**Run the tests:**
 
 ```bash
-uvicorn server:app --reload      # http://localhost:8000
-pytest -q                        # Python + frontend (Node) tests
+pytest -q        # Python tests + frontend tests (Node.js)
 ```
 
-The legacy Streamlit UI (`streamlit run app.py`) still works and shares the same logic. It will be removed once the new UI is confirmed to do everything the Streamlit version does.
+**Deploy (Render):** create a Blueprint from `render.yaml`, set `GEMINI_API_KEY` in the dashboard, and open the HTTPS URL on a phone. HTTPS is needed for the camera and GPS.
 
-## Using the app
+## 🎤 Demo flow (about 3 minutes)
 
-The layout is map-first: header, a reporting sidebar on the left, and a full-height map on the right. Steps:
+1. **Problem (30 s)**: "You trip on a raised slab by Geisel. Who do you tell, and what do you say?"
+2. **Live demo (90 s)**:
+   - upload a sidewalk photo → **Analyze**
+   - search "Outside Geisel Library at UCSD" → drag the pin onto the slab → confirm
+   - review the P1 suggestion and the cost shown as unavailable → choose **UCSD**
+   - copy the report → **Open UCSD Report It**
+3. **How it works (30 s)**: Gemini only observes; Python decides urgency; nothing is invented; you submit the report yourself.
+4. **Impact + next step (30 s)**: better reports for UCSD and City crews. Next: a real-photo evaluation set and a consent-based public map.
 
-1. **Photo**: choose **Take a photo** (opens the phone's rear camera) or **Upload a photo**. The photo is downscaled and its EXIF/GPS metadata removed before analysis.
-2. **AI analysis**: Gemini returns the issue type, a description, visible evidence, up to three *unverified* root-cause hypotheses, and photo quality. Intact photos return `no_visible_issue` and unclear ones return `uncertain`.
-3. **Where is it?**: there are four ways to set the pin:
-   - search for a place or address, e.g. "Outside Geisel Library at UCSD"
-   - **Use my location** (one-time GPS)
-   - click the map or drag the pin
-   - type coordinates
+## ✅ Testing
 
-   Then tick **Confirm this is the issue location**. Moving the pin clears the confirmation.
-4. **Review your report**: edit the issue type, description, evidence, causes, urgency, and destination. The report has four sections: the problem and possible causes, estimated repair cost, urgency, and estimated repair time.
-5. **Send it**: copy the text, download JSON, text, or photo, and open the official site to submit there.
+- **Automated:** 112 tests (`pytest -q`).
+  - **Report rules:** schema rules, the honest cost/time policy, the P0–P3 rule, and that "no damage" can never be "ready".
+  - **Gemini output:** cleanup of the response and photo validation.
+  - **Place search:** query cleanup, caching, rate limiting, and back-off.
+  - **API:** errors, upload limits, log redaction, and the static-files check.
+  - **Frontend:** stale-response handling, run with Node's test runner.
+- **End-to-end in Chrome (Playwright):** 32 of 32 checks pass at desktop size and at a 390px phone width, using real Gemini and Nominatim calls. They cover:
+  - search, dragging the pin, Space-to-drop, GPS, and typed coordinates
+  - that an edit invalidates the report
+  - that copied text, JSON, and the pin all have the same coordinates
+  - that status never becomes `submitted`
+- **Not yet done:**
+  - a set of real damaged, intact, and blurry sidewalk photos (only synthetic images were used so far)
+  - camera and GPS on a real phone over HTTPS
 
-**Keyboard map controls:** Tab to the map, then use the arrow keys to move, **+**/**−** to zoom, and **Space** to drop the pin at the crosshair. Press **Space** again to adjust. There are also on-screen pan and zoom buttons. On phones, step 3 shows a large map with a crosshair and a **Place pin here** button.
+## 📂 Repository Structure
 
-**Design reference:** the layout follows the structure of FixMyStreet's report page: header, sidebar wizard, sticky Continue button, map controls, and keyboard banner. It is rebuilt from scratch, and no FixMyStreet code, assets, tiles, or branding are used.
+```
+aic-hackathon/
+├── server.py              # FastAPI server: static UI + /api/analyze, /api/geocode, /api/report
+├── ai_analysis.py         # Photo validation, Gemini prompt + structured output, sanitizing
+├── geocoding.py           # Nominatim place search (policy-compliant)
+├── report.py              # Report schema, P0–P3 rule, cost/time policy, text export
+├── static/
+│   ├── index.html         # Map-first page: header, 5-step sidebar wizard, map
+│   ├── app.css            # Layout and styles (desktop + phone)
+│   ├── app.js             # Wizard, Leaflet map, search, GPS, exports
+│   ├── report-sync.js     # Keeps the report in sync with edits
+│   └── logo.svg
+├── tests/                 # pytest suites + tests/js (Node test runner)
+├── app.py, location.py    # Legacy Streamlit UI (being retired)
+├── render.yaml            # Render deployment blueprint
+├── requirements.txt       # Runtime dependencies
+├── requirements-dev.txt   # + pytest, httpx
+└── CLAUDE.md              # Project brief / build instructions
+```
 
-## Design decisions
+## ⚠️ Limitations and responsible use
 
-- **Gemini only observes.** It returns observation flags. `report.suggest_urgency()` maps them to a provisional level in this order:
-  - unusable or uncertain photo → `uncertain`
-  - no visible issue → `uncertain`
-  - danger → **P0**
-  - trip or access obstacle → **P1**
-  - cosmetic → **P3**
-  - otherwise **P2**
+- Gemini is **not** a certified inspector. Its classifications and possible causes need your review.
+- A photo can't establish size, depth, materials, cost, or ADA compliance, so the app doesn't guess.
+- GPS gives *your* position. Always move the pin onto the defect and confirm it.
+- FixMySanDiego is not affiliated with the City of San Diego or UC San Diego. Opening their sites doesn't submit anything.
+- **The layout is modelled on FixMyStreet's report page** (mySociety). It was rebuilt from scratch, and no FixMyStreet code, assets, or branding are used.
 
-  These are suggestions, not official priorities, and you can edit them.
-- **Cost and repair time are always `unavailable`** (null amounts). A "preliminary" estimate is only accepted with a complete, non-negative range, a stated basis, and an http(s) source.
-- **Status is `draft` or `ready_for_manual_submission` only.** `submitted` cannot pass validation. "Ready" requires all of:
-  - a detected issue type
-  - a confirmed location that isn't the demo coordinate
-  - a chosen destination
-- **Limits:** 15 analyses and 20 searches per IP address per hour, and a 10 MB photo limit.
-- **Security:**
-  - A strict Content-Security-Policy; model and search text is inserted as plain text, never as HTML.
-  - Uvicorn's access log has query strings stripped, and the server never imports Streamlit.
-- **Model selection** was checked against this API key on 2026-11-07. `gemini-3.8-flash` and `gemini-3.7-flash` timed out on Gemini's side (504). `gemini-3.6-flash` answered in about 4–8 s and is the default. `gemini-3.5-flash-lite` answered in about 1 s and is the automatic fallback.
+## 📄 License
 
-## Location search (OpenStreetMap Nominatim)
-
-`geocoding.py` turns a description into at most two queries:
-- It strips phrases like "outside" or "in front of".
-- It tries the part before "at"/"near" as a fallback.
-- It adds ", San Diego, California" unless the text already names the area.
-
-Results are limited to a San Diego County bounding box. If nothing matches, no pin is placed.
-
-The app follows the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/):
-- Searches run only when you submit; there is no autocomplete.
-- Requests are limited to one per 1.1 s across the whole app.
-- Results are cached for 24 h.
-- After an HTTP 403, 429 or 5xx error, searching pauses for 60 s.
-- Requests send an identifying User-Agent, which you can override with `NOMINATIM_USER_AGENT`.
-- OpenStreetMap attribution is shown.
-
-Set `GEOCODER_ENABLED=false` to turn search off without a code change. The public service is meant for light use.
-
-## Deploy (Render)
-
-1. On render.com, choose **New → Blueprint** and select this GitHub repo. `render.yaml` sets the build command, the start command (`uvicorn server:app … --proxy-headers`), Python 3.11.16, and the health check.
-2. Set `GEMINI_API_KEY`, and optionally `NOMINATIM_USER_AGENT` with contact details, in the service's **Environment** tab. Never commit them.
-3. Open the HTTPS URL on a phone and test the camera, GPS (allow and deny), dragging the pin, search, export, and the links.
-
-The free tier sleeps when idle, so the first request can take about 30 s. The public app spends your Gemini quota, so rotate the key after the event.
-
-## Testing status
-
-- **Automated: `pytest -q`.**
-  - Python: schema validation, cost/time honesty rules, the urgency rubric, `build_report`, Gemini-output cleanup, image validation, geocoding, and the API. The API tests use stubbed services and cover upload limits, error codes, rate limits, log redaction, and the static-files check.
-  - Frontend: `tests/js/report-sync.test.js` (stale or out-of-order responses, invalidation, debouncing), run through Node's built-in test runner.
-- **Live API (real Gemini and Nominatim):** analyze → `cracked_sidewalk` in 6.5 s; "Outside Geisel Library at UCSD" → Geisel Library; the report came back `ready_for_manual_submission`; the access log shows paths only.
-- **Headless Chrome screenshots:** the desktop layout (1440×900) renders as designed. Phone widths below 500px still need device emulation or a real phone.
-
-## Not yet verified
-
-- A click-through of the full UI in a browser, including Space-to-drop, dragging, Copy, and downloads. This needs Playwright or manual testing.
-- Phone camera, GPS, and the full-screen map step on a real phone over HTTPS (after deploying to Render).
-- A real-photo classification set (CLAUDE.md §9). Only synthetic images have been used so far.
-- Reverse geocoding (optional) is not implemented. Drafts live only in the browser tab.
+No license file has been added yet, so all rights are reserved by the authors for now. Map data © OpenStreetMap contributors (ODbL).
