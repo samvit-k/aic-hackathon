@@ -2,14 +2,14 @@
 # Create the service from this repo, then set GEMINI_API_KEY in the Render dashboard.
 services:
   - type: web
-    name: fixitsandiego
+    name: fixmysandiego
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
     # --proxy-headers lets rate limits see the real client IP behind Render's proxy.
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
     healthCheckPath: /healthz
-    autoDeploy: false
+    autoDeploy: true  # redeploy on every push to main
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.16
