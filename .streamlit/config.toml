@@ -1,0 +1,6 @@
+[server]
+# Photos are capped at 10 MB in app code; this is the hard server-side ceiling.
+maxUploadSize = 15
+
+[browser]
+gatherUsageStats = false
