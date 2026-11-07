@@ -1,9 +1,9 @@
-"""SidewalkAI — photo -> Gemini analysis -> confirmed location -> editable report -> official handoff."""
+"""FixItSanDiego — photo -> Gemini analysis -> confirmed location -> editable report -> official handoff."""
 from __future__ import annotations
 
 import streamlit as st
 
-st.set_page_config(page_title="SidewalkAI", page_icon="🚧", layout="centered")
+st.set_page_config(page_title="FixItSanDiego", page_icon="🚧", layout="centered")
 
 from pydantic import ValidationError  # noqa: E402
 
@@ -78,7 +78,7 @@ def _lines(text: str) -> list[str]:
 
 
 # --------------------------------------------------------------------------- #
-st.title("🚧 SidewalkAI")
+st.title("🚧 FixItSanDiego")
 st.write(
     "Photograph a sidewalk, curb, or street-surface problem. Gemini drafts a description, "
     "you confirm the location and details, then submit it yourself on the official "
@@ -242,7 +242,7 @@ st.caption("A photo can't establish measurements, materials, or crew scope, so n
 
 # ---- Section 3: urgency
 st.subheader("3. Urgency / priority (provisional)")
-st.caption(f"SidewalkAI suggests **{suggested_level}** — not an official City/UCSD priority.")
+st.caption(f"FixItSanDiego suggests **{suggested_level}** — not an official City/UCSD priority.")
 st.selectbox("Urgency", URGENCY_LEVELS, key="edit_urgency",
              format_func=lambda u: URGENCY_LABELS[u])
 level = ss.edit_urgency
@@ -251,7 +251,7 @@ st.write(f"**Reason:** {reason}")
 st.caption("Human review required: **yes**")
 if level == "P0":
     st.error(
-        "**Possible immediate danger.** SidewalkAI is not an emergency tool and routine "
+        "**Possible immediate danger.** FixItSanDiego is not an emergency tool and routine "
         "reporting may not be adequate. If anyone is at risk, call **911**. For urgent "
         "campus hazards, call UCSD Facilities; for urgent city street hazards, contact the City.",
         icon="🚨",
@@ -331,12 +331,12 @@ st.markdown("**Report text** (use the copy icon, then paste into the official fo
 st.code(text, language=None, wrap_lines=True)
 c1, c2 = st.columns(2)
 c1.download_button("Download JSON", report.model_dump_json(indent=2),
-                   file_name=f"sidewalkai-{report.report_id[:8]}.json",
+                   file_name=f"fixitsandiego-{report.report_id[:8]}.json",
                    mime="application/json", width="stretch", on_click="ignore")
-c2.download_button("Download text", text, file_name=f"sidewalkai-{report.report_id[:8]}.txt",
+c2.download_button("Download text", text, file_name=f"fixitsandiego-{report.report_id[:8]}.txt",
                    mime="text/plain", width="stretch", on_click="ignore")
 st.download_button("Download photo", ss.image_bytes,
-                   file_name=f"sidewalkai-{report.report_id[:8]}.jpg",
+                   file_name=f"fixitsandiego-{report.report_id[:8]}.jpg",
                    mime="image/jpeg", width="stretch", on_click="ignore")
 
 st.subheader("Open the official reporting site")
@@ -354,6 +354,6 @@ if "city" in targets and report.issue.type in ("pothole", "curb_damage", "other_
                "'Sidewalk' doesn't fit.")
 st.caption(
     "Opening the site does **not** submit anything. Paste the report text, upload the photo "
-    "if asked, and complete the submission there. SidewalkAI never marks a report as "
+    "if asked, and complete the submission there. FixItSanDiego never marks a report as "
     "submitted and has no official case number."
 )
