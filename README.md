@@ -86,7 +86,9 @@ FastAPI server (server.py)
 
 ## 🚀 Quick Start
 
-Requires **Python 3.11+** and a Gemini API key from [Google AI Studio](https://aistudio.google.com/).
+**Just want to try it?** Use the live app at **https://aic-hackathon.onrender.com/**. You don't need to install anything.
+
+To run your own copy locally, you'll need **Python 3.11+** and a Gemini API key from [Google AI Studio](https://aistudio.google.com/).
 
 ```bash
 # 1. Clone
@@ -105,7 +107,7 @@ echo "GEMINI_API_KEY=your-key-here" > .env
 uvicorn server:app --host 127.0.0.1 --port 8000
 ```
 
-Open **http://localhost:8000**.
+Then open **http://localhost:8000** (local development only; the hosted app is at https://aic-hackathon.onrender.com/).
 
 **Optional settings in `.env`:**
 
