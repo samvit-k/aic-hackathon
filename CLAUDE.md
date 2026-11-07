@@ -1,8 +1,14 @@
 # SidewalkAI - Claude Code Project Instructions
 
+> **Stack update (2026-11-07):** The product is now branded **FixItSanDiego**, and its UI has moved from Streamlit to a **FastAPI server (`server.py`) + static HTML/CSS/JS frontend (`static/`) with a Leaflet map**, deployed on **Render**. Sections 4 and 7 describe the current stack and override any Streamlit-specific instruction elsewhere in this file.
+>
+> The product rules in Sections 3, 5, 6, 9 and 10 still apply unchanged: photo-first flow, Gemini only observes, honest cost and time, no `submitted` status, manual official handoff.
+>
+> The legacy Streamlit UI (`app.py`, `location.py`) stays only until the new UI is confirmed to match it, then it is deleted.
+
 ## 1. Mission
 
-Build **SidewalkAI**, a mobile-friendly **Streamlit (Python)** web app that helps UC San Diego (UCSD) students and San Diego residents document non-emergency sidewalk, curb, pothole, and street-surface defects. A person takes or uploads a photo, Gemini analyzes visible damage, the user verifies a GPS/map location, and the app creates an editable maintenance report. The user then opens the appropriate **official** reporting site and submits the information themselves.
+Build **SidewalkAI** (now **FixItSanDiego**), a mobile-friendly **Python-backed web app** (originally Streamlit, now FastAPI + a static map-first frontend) that helps UC San Diego (UCSD) students and San Diego residents document non-emergency sidewalk, curb, pothole, and street-surface defects. A person takes or uploads a photo, Gemini analyzes visible damage, the user verifies a GPS/map location, and the app creates an editable maintenance report. The user then opens the appropriate **official** reporting site and submits the information themselves.
 
 **Community goal:** Make damaged infrastructure easier to identify, document, prioritize for review, and report. The app supports existing civic/facilities workflows; it is not an official government reporting channel or an engineering inspector.
 
@@ -49,20 +55,22 @@ A hackathon judge must be able to:
 
 | Layer | Use | Notes |
 | --- | --- | --- |
-| App UI | **Streamlit** | A responsive Python web app; no separate JavaScript frontend is required. |
+| Web server | **FastAPI** (`server.py`) on **uvicorn** | Serves the static UI and a small JSON API: `/api/config`, `/api/analyze`, `/api/geocode` (POST), `/api/report`, `/healthz`. Holds no drafts. |
+| App UI | Plain **HTML/CSS/JS** in `static/` | Map-first layout modelled on FixMyStreet's report page, rebuilt from scratch with no copied code, assets or branding. No build step. |
 | Language | **Python 3.11+** | Prefer simple functions and small modules. |
-| Image input | `st.camera_input`, `st.file_uploader` | Provide both because some phone browsers restrict embedded camera access. |
-| AI analysis | Official `google-genai` Python SDK and a vision-capable Gemini model | No training dataset needed for the MVP. |
+| Image input | `<input type=file accept="image/*" capture="environment">` plus a plain upload | Server re-validates, downscales and strips EXIF (`ai_analysis.prepare_image`). |
+| AI analysis | Official `google-genai` Python SDK, vision-capable Gemini model | Default `gemini-3.6-flash`, fallback `gemini-3.5-flash-lite`, both configurable. |
 | AI output validation | `pydantic` | Validate enums, field types, and ambiguous/empty responses. |
-| Session data | `st.session_state` | Preserve image, AI result, edits, and map pin across Streamlit reruns. |
-| GPS | `streamlit-geolocation` browser component | It uses browser `navigator.geolocation.getCurrentPosition()`; test on the deployed phone. |
-| GPS fallback | `st.number_input` for latitude/longitude | Must work if geolocation permission or the component fails. |
-| Interactive map | `folium` and `streamlit-folium` | Use `st_folium()` map clicks to move the report pin. |
-| Export | Built-in `st.download_button` and `st.code` | Download JSON and display easily copied report text. |
-| Secrets | `st.secrets` locally/cloud, with environment fallback | Never expose or commit the Gemini API key. |
-| Hosting | Streamlit Community Cloud (or an HTTPS Streamlit host) | HTTPS is important for camera/GPS permissions on mobile. |
+| Canonical report | `report.build_report()` | The only place a report is built and validated; the UI never builds reports itself. |
+| Client state | One JS state object + `static/report-sync.js` | Any edit drops the old report at once; stale responses are discarded. |
+| GPS | Browser `navigator.geolocation.getCurrentPosition` (one-time, on click) | Real error messages for denied, unavailable and timed-out requests; manual entry always available. |
+| Place search | OpenStreetMap Nominatim via `geocoding.py` | Submit-only, cached, rate limited, policy-compliant; text sent in a POST body. |
+| Interactive map | **Leaflet 1.9.4** (unpkg + SRI), OpenStreetMap tiles | Click or drag the pin, Space to drop at the crosshair, on-screen pan/zoom, full-screen map step on phones. |
+| Export | Blob downloads (JSON, text, photo) + `navigator.clipboard` with a select-text fallback | Disabled while the report is stale. |
+| Secrets | Environment variables / `.env` (python-dotenv); Render env vars in production | Never expose or commit the Gemini API key. |
+| Hosting | **Render** (`render.yaml`) | HTTPS is required for camera and GPS on phones. |
 
-**Do not switch back to Next.js, TypeScript, React, or a separate API backend.** Streamlit executes Python server-side. A backend service is optional only if future needs require one.
+**Do not adopt React, Next.js, TypeScript, or a JS build step.** Keep the frontend dependency-free apart from Leaflet, and keep all business rules in Python.
 
 ### Dependencies
 
@@ -269,42 +277,43 @@ Schema instructions:
 - Use `null` for unknown measurements, cost, durations, and GPS; do not invent missing values.
 - Keep report data consistent across the UI, exported JSON, and copied text.
 
-## 7. Streamlit implementation requirements
+## 7. Web app implementation requirements
 
-- Call `st.set_page_config(page_title="SidewalkAI", layout="centered")` early in `app.py`.
-- Use Streamlit widgets rather than manually injecting a full HTML/React app.
-- Use `st.session_state` for `image_bytes`, `image_hash`, `analysis`, `location`, `location_confirmed`, `report`, and review state.
-- Call Gemini **only after a user's Analyze click**, then persist the validated result; avoid repeat charges on reruns.
-- Display progress with `st.spinner` and actionable error messages; handle missing API keys gracefully.
-- Keep the image under a reasonable configured max file size; avoid logging image data or coordinates.
-- When two inputs can supply a photo, ensure deterministic selection and avoid stale session state.
-- When a location component returns no data, show manual entry instead of crashing.
-- Do not mistakenly use server IP/location to determine the user's GPS.
-- Keep controls touch-friendly and the layout readable on narrow phone screens.
-- If external components fail on a phone, degrade gracefully to manual input.
+- Call Gemini **only from `POST /api/analyze`**, which only the Analyze button triggers. The browser keeps the validated result.
+- Build every report through `report.build_report()` (`POST /api/report`). JSON, text and status must come from that one object.
+- Any edit must invalidate the displayed report immediately (`ReportSync.invalidate`). Continue, Copy, downloads and official links stay disabled until a fresh report arrives. Never let a stale response overwrite newer edits.
+- Insert model and geocoder text with `textContent` only, never `innerHTML`. Keep the Content-Security-Policy in `server.py` strict.
+- Keep the 10 MB upload cap, per-IP rate limits and the Nominatim policy measures. Never log images, coordinates or search text: search is a POST body, and the access log strips query strings.
+- The server must not import Streamlit. `get_setting` reads `st.secrets` only when Streamlit is already loaded.
+- Never use the server's IP or location as the user's GPS. Location comes from the browser, a map click, search or typed coordinates, and the user must confirm it.
+- Keep controls touch-friendly. Below 48em the layout is a single column, and step 3 shows a full-screen map with a crosshair.
+- If GPS, search or the map fail, degrade to the remaining inputs instead of blocking.
 
 ### Secrets and configuration
 
-Use a local `.streamlit/secrets.toml` ignored by Git, or environment variables:
+Use a local `.env` (git-ignored) or environment variables. On Render, set them in the service's Environment tab:
 
-```toml
-# .streamlit/secrets.toml.example (not a real key)
-GEMINI_API_KEY = "replace-with-your-key"
-GEMINI_MODEL = "choose-a-current-vision-capable-model"
+```text
+GEMINI_API_KEY=replace-with-your-key
+GEMINI_MODEL=gemini-3.6-flash
+GEMINI_FALLBACK_MODEL=gemini-3.5-flash-lite
+GEOCODER_ENABLED=true
+NOMINATIM_USER_AGENT=FixItSanDiego/0.1 (+site; contact)
 ```
 
-Create a proper `.gitignore` that excludes `.streamlit/secrets.toml`, `.env`, Python cache files, and local credentials. In Streamlit Community Cloud, set actual secrets in the app's secrets management UI.
+`.gitignore` must exclude `.env`, `.streamlit/secrets.toml`, Python caches and local credentials.
 
 ### Local run command
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py
+pip install -r requirements-dev.txt
+uvicorn server:app --reload        # http://localhost:8000
+pytest -q                          # Python + Node frontend tests
 ```
 
-When deploying, add the repository to Streamlit Community Cloud, set the Gemini key in the deployment's secrets configuration, and test the **HTTPS** URL on a real phone. Localhost may have different camera/GPS permission behavior from mobile browsers on a local-network HTTP address.
+To deploy, create a Render Blueprint from `render.yaml`, set the secrets, and test the **HTTPS** URL on a real phone.
 
 ## 8. Timeboxed two-hour build plan
 
@@ -381,4 +390,4 @@ Do not mark a feature complete until the code runs. If a dependency is unavailab
 
 ## Final instruction to Claude Code
 
-**Implement SidewalkAI in Streamlit and Python, not Next.js.** Follow the concise checklist in Section 2 in order. Build the smallest dependable photo -> Gemini analysis -> confirmed GPS/manual pin -> editable, qualified JSON report -> user-directed official reporting handoff. Make the entire flow demonstrable within two hours before attempting maps with multiple reports, additional AI models, a database, or an autonomous agent.
+**Maintain FixItSanDiego as a FastAPI + static-frontend app with all business rules in Python (see Sections 4 and 7). Do not reintroduce Streamlit-only patterns or a JS framework.** The checklist in Section 2 records the original build order. Build the smallest dependable photo -> Gemini analysis -> confirmed GPS/manual pin -> editable, qualified JSON report -> user-directed official reporting handoff. Make the entire flow demonstrable within two hours before attempting maps with multiple reports, additional AI models, a database, or an autonomous agent.
