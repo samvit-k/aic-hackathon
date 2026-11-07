@@ -274,3 +274,54 @@ def test_report_text_never_raises_on_constructed_objects():
     text = report_text(r)
     assert "Not enough information to estimate" in text
     assert "Active hands-on repair duration: unavailable" in text
+
+
+# ----------------------------- build_report -------------------------------- #
+from report import build_report  # noqa: E402
+
+AI = dict(issue_type="uneven_sidewalk", issue_detected=True, description="Raised slab.",
+          visible_evidence=["Uneven joint"], possible_root_causes=["Roots", "Settlement"],
+          image_quality="clear", uncertainty_notes="", apparent_immediate_danger=False,
+          possible_trip_or_access_obstacle=True, minor_or_cosmetic=False, needs_human_review=True)
+CONFIRMED = LocationInfo(latitude=32.88, longitude=-117.23, user_confirmed=True, source="manual")
+
+
+def br(**kw):
+    base = dict(analysis=AI, report_id="r1", created_at="2026-11-07T00:00:00+00:00")
+    base.update(kw)
+    return build_report(**base)
+
+
+def test_build_report_defaults_from_analysis():
+    r = br()
+    assert r.issue.type == "uneven_sidewalk" and r.issue.description == "Raised slab."
+    assert r.urgency.level == r.urgency.suggested_level == "P1"
+    assert r.issue.possible_root_causes == ["Roots", "Settlement"]
+    assert r.submission.status == "draft" and r.estimated_cost.status == "unavailable"
+
+
+def test_build_report_edits_and_override_reason():
+    r = br(edits={"description": "Edited", "visible_evidence": "a\n- b\n\n",
+                  "possible_root_causes": "1\n2\n3\n4", "urgency": "P3"})
+    assert r.issue.description == "Edited"
+    assert r.issue.visible_evidence == ["a", "b"]
+    assert r.issue.possible_root_causes == ["1", "2", "3"]
+    assert r.urgency.level == "P3" and r.urgency.reason.startswith("Set by the user")
+
+
+def test_build_report_type_change_drops_ai_flags():
+    r = br(edits={"issue_type": "pothole"})
+    assert r.urgency.suggested_level == "P2"  # trip flag belonged to the AI's category
+
+
+def test_build_report_ready_and_no_damage():
+    assert br(location=CONFIRMED, destination="city").submission.status == \
+        "ready_for_manual_submission"
+    assert br(location=CONFIRMED, destination="unsure").submission.destination is None
+    r = br(location=CONFIRMED, destination="city", edits={"issue_type": "no_visible_issue"})
+    assert r.submission.status == "draft" and r.urgency.suggested_level == "uncertain"
+
+
+def test_build_report_empty_description_invalid():
+    with pytest.raises(ValidationError):
+        br(edits={"description": "   "})
