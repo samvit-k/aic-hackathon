@@ -62,7 +62,7 @@ DESTINATIONS = {
 }
 
 UNMEASURED_NOTE = (
-    "Physical dimensions were not measured; this is a FixItSanDiego suggestion, "
+    "Physical dimensions were not measured; this is a FixMySanDiego suggestion, "
     "not an official City/UCSD priority."
 )
 
@@ -187,7 +187,7 @@ class Submission(BaseModel):
 class Report(BaseModel):
     report_id: str
     created_at: str
-    generator: str = "FixItSanDiego draft (AI-assisted, human-reviewed; not an official inspection)"
+    generator: str = "FixMySanDiego draft (AI-assisted, human-reviewed; not an official inspection)"
     issue: IssueSection
     urgency: UrgencySection
     estimated_cost: CostEstimate = Field(default_factory=CostEstimate)
@@ -257,7 +257,7 @@ def suggest_urgency(
 def urgency_reason(level: str, suggested_level: str, suggested_reason: str) -> str:
     if level == suggested_level:
         return suggested_reason
-    return f"Set by the user (FixItSanDiego suggested {suggested_level}). {suggested_reason}"
+    return f"Set by the user (FixMySanDiego suggested {suggested_level}). {suggested_reason}"
 
 
 def readiness_blocker(
@@ -409,7 +409,7 @@ def report_text(r: Report) -> str:
     """Human-readable report suitable for pasting into an official form."""
     i, u, t, loc = r.issue, r.urgency, r.estimated_repair_time, r.location
     lines = [
-        "SIDEWALK / STREET SURFACE ISSUE REPORT (draft prepared with FixItSanDiego)",
+        "SIDEWALK / STREET SURFACE ISSUE REPORT (draft prepared with FixMySanDiego)",
         f"Report ID: {r.report_id}",
         f"Created: {r.created_at}",
         f"Location (lat, lon): {_fmt_coord(loc)}",
@@ -428,7 +428,7 @@ def report_text(r: Report) -> str:
         "2. ESTIMATED REPAIR COST",
         cost_text(r.estimated_cost),
         "",
-        "3. URGENCY / PRIORITY (provisional FixItSanDiego suggestion, not official)",
+        "3. URGENCY / PRIORITY (provisional FixMySanDiego suggestion, not official)",
         f"Level: {URGENCY_LABELS.get(u.level, u.level)}",
         f"Reason: {u.reason}",
         "Human review required: yes",
