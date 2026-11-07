@@ -1,4 +1,4 @@
-/* FixItSanDiego client: wizard state, Leaflet map, and calls to the FastAPI backend.
+/* FixMySanDiego client: wizard state, Leaflet map, and calls to the FastAPI backend.
  * All model/geocoder text is inserted with textContent (never innerHTML).
  * Report freshness is handled by ReportSync (static/report-sync.js).
  */
@@ -328,7 +328,7 @@
     $("active-time").textContent = r.active_time_text;
     $("agency-time").textContent = r.agency_time_text;
     $("urgency-suggestion").textContent =
-      `FixItSanDiego suggests ${rep.urgency.suggested_level} — not an official City/UCSD priority.`;
+      `FixMySanDiego suggests ${rep.urgency.suggested_level} — not an official City/UCSD priority.`;
     $("urgency-reason").textContent = `Reason: ${rep.urgency.reason}`;
     $("p0-banner").hidden = level !== "P0";
     $("p1-banner").hidden = level !== "P1";
