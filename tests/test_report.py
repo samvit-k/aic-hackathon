@@ -244,6 +244,17 @@ def test_json_and_text_coordinates_match():
     assert data["submission"]["official_case_id"] is None
 
 
+def test_search_source_and_address_exported():
+    loc = LocationInfo(latitude=32.881139, longitude=-117.237571, source="search",
+                       address="Geisel Library, San Diego", user_confirmed=True)
+    r = make_report(location=loc)
+    assert "Nearby place (OpenStreetMap match): Geisel Library, San Diego" in report_text(r)
+    data = json.loads(r.model_dump_json())
+    assert data["location"]["address"] == "Geisel Library, San Diego"
+    assert data["location"]["source"] == "search"
+    assert "Nearby place" not in report_text(make_report())
+
+
 def test_text_handles_missing_location_and_demo_label():
     assert "Not provided" in report_text(make_report(location=LocationInfo()))
     demo = LocationInfo(latitude=32.88, longitude=-117.23, source="demo_test_coordinate")
