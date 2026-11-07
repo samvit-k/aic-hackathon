@@ -34,7 +34,7 @@ pytest -q        # requires: pip install pytest
 
 1. **Photo**: upload one, or switch on the camera toggle and take one. A preview appears. The photo is downscaled and its EXIF/GPS metadata is removed before analysis.
 2. **Analyze**: Gemini returns the issue type, a description, visible evidence, up to three *unverified* root-cause hypotheses, and image quality. Intact photos return `no_visible_issue` and unclear ones return `uncertain`.
-3. **Location**: tap 📍 for a one-time GPS fix, tap the map, or type coordinates. Then tick **Confirm This Issue Location**. Moving the pin clears the confirmation. **Use demo test coordinate** is clearly labeled and can never produce a "ready" report.
+3. **Location**: search for a place or address (for example "Outside Geisel Library at UCSD"), tap 📍 for a one-time GPS fix, tap the map, or type coordinates. Then tick **Confirm This Issue Location**. Moving the pin clears the confirmation. **Use demo test coordinate** is clearly labeled and can never produce a "ready" report.
 4. **Repair Assessment**: edit the issue type, description, evidence, causes, and urgency. The report has four sections: problem and possible causes, estimated repair cost, urgency, and estimated repair time.
 5. **Export**: copy the text block, download the JSON, text, and photo, choose UCSD or the City, and open the official site to submit there.
 
@@ -45,6 +45,21 @@ pytest -q        # requires: pip install pytest
 - **Status is `draft` or `ready_for_manual_submission` only.** The value `submitted` cannot pass validation. "Ready" requires a detected issue type (not `no_visible_issue` or `uncertain`), a user-confirmed non-demo location, and a chosen destination.
 - **Gemini is called only when Analyze is clicked.** Reruns reuse the stored result, a new photo clears the old analysis, and each session is capped at 15 analyses.
 - **Model selection:** checked against this API key on 2026-11-07. `gemini-3.8-flash` and `gemini-3.7-flash` hit server timeouts (504). `gemini-3.6-flash` answered in about 4–8 s and is the default. `gemini-3.5-flash-lite` answered in about 1 s and is the automatic fallback.
+
+## Location search (OpenStreetMap Nominatim)
+
+`geocoding.py` turns a description into at most two queries. It strips phrases like "outside" or "in front of", tries the part before "at"/"near" as a fallback, and adds ", San Diego, California" unless the text already names the area. Results are restricted to a San Diego County bounding box, and the user picks from up to five matches. If nothing matches, no pin is placed. Gemini is never involved.
+
+The app follows the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/):
+
+- Searches run only when the user submits; there is no autocomplete.
+- Requests are limited to one per 1.1 s across the whole app, and each session gets 20 searches.
+- Results are cached for 24 h.
+- After an HTTP 403, 429 or 5xx error, searching pauses for 60 s.
+- Requests send the identifying User-Agent `FixItSanDiego/0.1 (+repo URL)`. Override it with `NOMINATIM_USER_AGENT` and add contact details if you deploy publicly.
+- OpenStreetMap attribution is shown next to the search box.
+
+Set `GEOCODER_ENABLED=false` in `.env` or Streamlit secrets to turn search off without changing code. The public Nominatim service is meant for light use. For heavier traffic, use a commercial provider or self-host.
 
 ## Deploy (Streamlit Community Cloud)
 
@@ -57,7 +72,8 @@ The public app spends your Gemini quota. Rotate the key after the event.
 
 ## Testing status
 
-- Automated: **61 unit tests pass** (`tests/`). They cover schema validation, cost/time honesty rules, the urgency rubric, status gating, text/JSON consistency, Gemini-output sanitizing, and image validation.
+- Automated: **86 unit tests pass** (`tests/`). They cover schema validation, cost/time honesty rules, the urgency rubric, status gating, text/JSON consistency, Gemini-output sanitizing, image validation, and geocoding (query cleanup, result filtering, caching, rate limiting, back-off). The geocoding tests use no network.
+- Place search was checked live against Nominatim. "Outside Geisel Library at UCSD" resolved to Geisel Library, "Main Street" returned 5 choices, and gibberish returned none. Six queries took 5.6 s and repeats came from the cache.
 - Headless end-to-end (`streamlit.testing.AppTest` with a real Gemini call): all sections render without exceptions, reruns don't call Gemini again, coordinates match between JSON and text, editing coordinates clears confirmation, no-damage reports stay `draft`, and the P0 banner appears.
 - Real-image classification: **not yet run.** Only synthetic images were used, and Gemini correctly flagged them as synthetic or unclear. The 10–15 real photo test set in CLAUDE.md §9 is still to do. Record observed counts here.
 
