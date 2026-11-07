@@ -31,6 +31,7 @@ from report import (  # noqa: E402
     Submission,
     UrgencySection,
     active_time_text,
+    build_report,
     cost_text,
     new_report_id,
     now_iso,
@@ -283,32 +284,23 @@ dest_choice = st.radio(
 )
 destination = dest_choice if dest_choice in DESTINATIONS else None
 
-# ---- Build the canonical report
+# ---- Build the canonical report (shared with the FastAPI server)
 report = None
 try:
-    issue = IssueSection(
-        type=edited_type,
-        issue_detected=issue_detected,
-        description=(ss.edit_description or "").strip(),
-        visible_evidence=_lines(ss.edit_evidence),
-        possible_root_causes=causes,
-        image_quality=a["image_quality"],
-        needs_human_review=True,
-        uncertainty_notes=a["uncertainty_notes"],
-    )
-    report = Report(
+    report = build_report(
+        analysis=a,
+        edits={
+            "issue_type": edited_type,
+            "description": ss.edit_description or "",
+            "visible_evidence": ss.edit_evidence,
+            "possible_root_causes": causes,
+            "urgency": level,
+        },
+        location=location,
+        destination=destination,
+        photo=ss.image_meta,
         report_id=ss.report_id,
         created_at=ss.created_at,
-        issue=issue,
-        urgency=UrgencySection(level=level, suggested_level=suggested_level, reason=reason),
-        estimated_cost=cost,
-        estimated_repair_time=repair_time,
-        location=location,
-        photo=PhotoInfo(mime_type="image/jpeg", **(ss.image_meta or {})),
-        submission=Submission(
-            destination=destination,
-            status=submission_status(issue, location, destination),
-        ),
     )
 except ValidationError as exc:
     problems = "; ".join(e["msg"] for e in exc.errors())
