@@ -282,6 +282,89 @@ def submission_status(
     return "draft" if readiness_blocker(issue, location, destination) else "ready_for_manual_submission"
 
 
+def as_lines(value) -> list[str]:
+    """Accept a list or newline-separated text; strip bullets and blanks."""
+    if value is None:
+        return []
+    items = value if isinstance(value, (list, tuple)) else str(value).splitlines()
+    out: list[str] = []
+    for item in items:
+        s = str(item).strip(" -•\t\r\n")
+        if s:
+            out.append(s)
+    return out
+
+
+def build_report(
+    *,
+    analysis: dict,
+    edits: Optional[dict] = None,
+    location: Optional[LocationInfo] = None,
+    destination: Optional[str] = None,
+    photo: Optional[dict] = None,
+    report_id: str,
+    created_at: str,
+) -> Report:
+    """Single source of truth for turning AI analysis + user edits into a validated Report.
+
+    Raises pydantic.ValidationError when the edits are invalid (e.g. empty description).
+    """
+    edits = edits or {}
+    location = location or LocationInfo()
+    ai_type = analysis["issue_type"]
+    edited_type = edits.get("issue_type") or ai_type
+    issue_detected = edited_type not in NON_REPORTABLE_TYPES
+    same_type = edited_type == ai_type  # AI hazard flags only apply to the AI's own category
+    suggested_level, suggested_reason = suggest_urgency(
+        edited_type,
+        issue_detected,
+        analysis["image_quality"],
+        bool(analysis.get("apparent_immediate_danger")) and same_type,
+        bool(analysis.get("possible_trip_or_access_obstacle")) and same_type,
+        bool(analysis.get("minor_or_cosmetic")) and same_type,
+    )
+    level = edits.get("urgency") or suggested_level
+    description = edits.get("description")
+    if description is None:
+        description = analysis.get("description", "")
+    evidence = edits.get("visible_evidence")
+    causes = edits.get("possible_root_causes")
+    issue = IssueSection(
+        type=edited_type,
+        issue_detected=issue_detected,
+        description=str(description).strip(),
+        visible_evidence=as_lines(analysis.get("visible_evidence") if evidence is None else evidence),
+        possible_root_causes=as_lines(
+            analysis.get("possible_root_causes") if causes is None else causes)[:3],
+        image_quality=analysis["image_quality"],
+        needs_human_review=True,
+        uncertainty_notes=str(analysis.get("uncertainty_notes") or ""),
+    )
+    dest = destination if destination in DESTINATIONS else None
+    photo = photo or {}
+    return Report(
+        report_id=report_id,
+        created_at=created_at,
+        issue=issue,
+        urgency=UrgencySection(
+            level=level,
+            suggested_level=suggested_level,
+            reason=urgency_reason(level, suggested_level, suggested_reason),
+        ),
+        estimated_cost=CostEstimate(),
+        estimated_repair_time=RepairTimeEstimate(),
+        location=location,
+        photo=PhotoInfo(
+            mime_type="image/jpeg",
+            filename=photo.get("filename"),
+            original_format=photo.get("original_format"),
+            sha256=photo.get("sha256"),
+        ),
+        submission=Submission(destination=dest,
+                              status=submission_status(issue, location, dest)),
+    )
+
+
 def _fmt_list(items: list[str]) -> str:
     return "\n".join(f"  - {x}" for x in items) if items else "  - (none listed)"
 
