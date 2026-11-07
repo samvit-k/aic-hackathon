@@ -1,4 +1,4 @@
-"""FixItSanDiego web server: static map-first UI + small JSON API.
+"""FixMySanDiego web server: static map-first UI + small JSON API.
 
 Run locally:  uvicorn server:app --reload
 The browser keeps the draft state; this server is stateless apart from rate-limit
@@ -79,7 +79,7 @@ def check_static_dir(path: Path = STATIC_DIR) -> None:
     missing = [name for name in REQUIRED_STATIC_FILES if not (path / name).is_file()]
     if not path.is_dir() or missing:
         raise RuntimeError(
-            f"FixItSanDiego frontend not found: expected {path} containing "
+            f"FixMySanDiego frontend not found: expected {path} containing "
             f"{', '.join(REQUIRED_STATIC_FILES)} (missing: {', '.join(missing) or 'directory'}). "
             "Run the server from the project root of a complete checkout."
         )
@@ -128,7 +128,7 @@ ANALYZE_LIMIT = RateLimiter(15, 3600)
 GEOCODE_LIMIT = RateLimiter(20, 3600)
 
 check_static_dir()
-app = FastAPI(title="FixItSanDiego", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="FixMySanDiego", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -293,5 +293,5 @@ def make_report(body: ReportRequest):
         "cost_text": cost_text(report.estimated_cost),
         "active_time_text": active_time_text(report.estimated_repair_time),
         "agency_time_text": report.estimated_repair_time.agency_resolution_guidance or "unavailable",
-        "file_stem": f"fixitsandiego-{report.report_id[:8]}",
+        "file_stem": f"fixmysandiego-{report.report_id[:8]}",
     }
