@@ -46,7 +46,7 @@ ImageQuality = Literal["clear", "limited", "unusable"]
 Destination = Literal["ucsd", "city"]
 # Deliberately no "submitted": opening an official site is not submitting a report.
 SubmissionStatus = Literal["draft", "ready_for_manual_submission"]
-LocationSource = Literal["gps", "map_click", "manual", "demo_test_coordinate"]
+LocationSource = Literal["gps", "map_click", "search", "manual", "demo_test_coordinate"]
 
 DESTINATIONS = {
     "ucsd": {
@@ -330,6 +330,7 @@ def report_text(r: Report) -> str:
         f"Report ID: {r.report_id}",
         f"Created: {r.created_at}",
         f"Location (lat, lon): {_fmt_coord(loc)}",
+        *([f"Nearby place (OpenStreetMap match): {loc.address}"] if loc.address else []),
         f"Issue type: {ISSUE_LABELS.get(i.type, i.type)}",
         "",
         "1. PROBLEM EXPLANATION AND POSSIBLE ROOT CAUSES",
