@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import os
+import sys
 import warnings
 from dataclasses import dataclass
 from typing import Optional
@@ -52,16 +53,20 @@ Keep the description objective and concise (1-3 sentences)."""
 # Settings / secrets
 # --------------------------------------------------------------------------- #
 def get_setting(name: str, default: Optional[str] = None) -> Optional[str]:
-    """st.secrets first (Streamlit Cloud), then environment / .env."""
-    try:
-        import streamlit as st
+    """Environment / .env, plus st.secrets when running inside the legacy Streamlit app.
 
-        if name in st.secrets:
-            value = str(st.secrets[name]).strip()
-            if value:
-                return value
-    except Exception:  # no secrets.toml, or not running under Streamlit
-        pass
+    Streamlit is consulted only if it is already loaded, so the FastAPI server never
+    imports it (importing it would install Streamlit's own logging handlers).
+    """
+    st = sys.modules.get("streamlit")
+    if st is not None:
+        try:
+            if name in st.secrets:
+                value = str(st.secrets[name]).strip()
+                if value:
+                    return value
+        except Exception:  # no secrets.toml
+            pass
     value = os.environ.get(name, "").strip()
     return value or default
 
