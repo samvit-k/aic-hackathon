@@ -11,7 +11,7 @@ Main track: **AI for San Diego Impact (Civic life)**. Sponsor track: **Best Use 
 
 ---
 
-## 🧩 Problem
+## Problem
 
 When a UCSD student or San Diego resident trips over a raised sidewalk slab or spots a pothole, reporting it is harder than it should be:
 
@@ -21,7 +21,7 @@ When a UCSD student or San Diego resident trips over a raised sidewalk slab or s
 
 The City's own Get It Done sidewalk page estimates about **6 days for temporary mitigation** (such as ramping) and **8+ years for permanent repairs** ([source](https://getitdone.sandiego.gov/TSWNewReport?type=Sidewalk), checked Nov 7, 2026). Clear, well-located reports help that queue get triaged.
 
-## 💡 Solution
+## Solution
 
 FixMySanDiego turns one photo into a structured, editable report in five steps. You then submit it yourself on the official site.
 
@@ -40,24 +40,24 @@ It's a non-emergency tool. A P0 result shows a prominent 911 warning.
 
 ## 🛠 Features
 
-- 📸 **Camera or upload**: opens the phone's rear camera. Photos are validated, downscaled, and stripped of embedded EXIF/GPS metadata before analysis.
-- 🧠 **Gemini vision with structured output**: a Pydantic schema keeps the response shape fixed, the output is re-validated, and an automatic fallback model is used if the first one times out.
-- 🚦 **Rule-based urgency**: Gemini reports only what it observes (apparent danger, trip or access obstacle, cosmetic wear). A fixed rule in Python maps that to **P0–P3**, and you can edit the result.
-- 🗺️ **Map-first location picker** (Leaflet + OpenStreetMap):
+- **Camera or upload**: opens the phone's rear camera. Photos are validated, downscaled, and stripped of embedded EXIF/GPS metadata before analysis.
+- **Gemini vision with structured output**: a Pydantic schema keeps the response shape fixed, the output is re-validated, and an automatic fallback model is used if the first one times out.
+- **Rule-based urgency**: Gemini reports only what it observes (apparent danger, trip or access obstacle, cosmetic wear). A fixed rule in Python maps that to **P0–P3**, and you can edit the result.
+- **Map-first location picker** (Leaflet + OpenStreetMap):
   - click or drag the pin
   - on-screen pan and zoom buttons
   - **keyboard control**: arrow keys move, +/− zoom, Space drops the pin at the crosshair
   - a full-screen map with crosshair on phones
-- 🔎 **Plain-English place search** (OpenStreetMap Nominatim), limited to San Diego County and compliant with Nominatim's usage policy: search on submit only, cached, rate limited.
-- ✏️ **Live, consistent report**: every edit rebuilds the report on the server. Copy, downloads, and Continue are disabled until the updated version arrives.
-- 🏛️ **Official handoff**: links to UCSD Report It and City Get It Done. When it's unclear who maintains a spot, the app shows both and tells you to check.
-- 🔒 **Privacy and safety**:
+- **Plain-English place search** (OpenStreetMap Nominatim), limited to San Diego County and compliant with Nominatim's usage policy: search on submit only, cached, rate limited.
+- **Live, consistent report**: every edit rebuilds the report on the server. Copy, downloads, and Continue are disabled until the updated version arrives.
+- **Official handoff**: links to UCSD Report It and City Get It Done. When it's unclear who maintains a spot, the app shows both and tells you to check.
+- **Privacy and safety**:
   - no accounts or database; drafts stay in your browser tab
   - search text and coordinates are never logged
   - a strict Content-Security-Policy
   - hourly limits per IP address
 
-## 🤖 What the AI did
+## What the AI did
 
 | Where | Model / agent | Role |
 |---|---|---|
@@ -66,7 +66,7 @@ It's a non-emergency tool. A P0 result shows a prominent 911 warning.
 
 Models were chosen by testing what the team's API key could access on Nov 7, 2026. `gemini-3.8-flash` and `gemini-3.7-flash` timed out on Gemini's side. `gemini-3.6-flash` answered in about 4–8 s.
 
-## ⚙️ How it works
+## How it works
 
 ```
 Browser (static HTML/CSS/JS + Leaflet)
@@ -84,7 +84,7 @@ FastAPI server (server.py)
   - a confirmed, non-demo location
   - a chosen destination
 
-## 🚀 Quick Start
+## Quick Start
 
 **Just want to try it?** Use the live app at **https://aic-hackathon.onrender.com/**. You don't need to install anything.
 
@@ -130,7 +130,7 @@ pytest -q        # Python tests + frontend tests (Node.js)
 3. Set `GEMINI_API_KEY` in the dashboard.
 4. Open the HTTPS URL on a phone. HTTPS is needed for the camera and GPS.
 
-## 🎤 Demo flow (about 3 minutes)
+## Demo flow (about 3 minutes)
 
 1. **Problem (30 s)**: "You trip on a raised slab by Geisel. Who do you tell, and what do you say?"
 2. **Live demo (90 s)**:
@@ -141,7 +141,7 @@ pytest -q        # Python tests + frontend tests (Node.js)
 3. **How it works (30 s)**: Gemini only observes; Python decides urgency; nothing is invented; you submit the report yourself.
 4. **Impact + next step (30 s)**: better reports for UCSD and City crews. Next: a real-photo evaluation set and a consent-based public map.
 
-## ✅ Testing
+## Testing
 
 - **Automated:** 112 tests (`pytest -q`).
   - **Report rules:** schema rules, the honest cost/time policy, the P0–P3 rule, and that "no damage" can never be "ready".
@@ -158,7 +158,7 @@ pytest -q        # Python tests + frontend tests (Node.js)
   - a set of real damaged, intact, and blurry sidewalk photos (only synthetic images were used so far)
   - camera and GPS on a real phone over HTTPS
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 aic-hackathon/
@@ -180,7 +180,7 @@ aic-hackathon/
 └── CLAUDE.md              # Project brief / build instructions
 ```
 
-## ⚠️ Limitations and responsible use
+## Limitations and responsible use
 
 - Gemini is **not** a certified inspector. Its classifications and possible causes need your review.
 - A photo can't establish size, depth, materials, cost, or ADA compliance, so the app doesn't guess.
@@ -188,6 +188,6 @@ aic-hackathon/
 - FixMySanDiego is not affiliated with the City of San Diego or UC San Diego. Opening their sites doesn't submit anything.
 - **The layout is modelled on FixMyStreet's report page** (mySociety). It was rebuilt from scratch, and no FixMyStreet code, assets, or branding are used.
 
-## 📄 License
+## License
 
 No license file has been added yet, so all rights are reserved by the authors for now. Map data © OpenStreetMap contributors (ODbL).
