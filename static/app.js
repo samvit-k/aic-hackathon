@@ -71,6 +71,7 @@
     const hit = (state.config?.issue_types || []).find((x) => x.value === t);
     return hit ? hit.label : t;
   };
+  const qualityText = (a) => a.image_quality + (a.uncertainty_notes ? ` — ${a.uncertainty_notes}` : "");
   function makeRadio(name, value, label, checked) {
     const wrap = document.createElement("label");
     wrap.className = "radio";
@@ -255,7 +256,7 @@
     $("r-desc").textContent = a.description;
     fillList($("r-evidence"), a.visible_evidence);
     fillList($("r-causes"), a.possible_root_causes);
-    $("r-quality").textContent = a.image_quality + (a.uncertainty_notes ? ` — ${a.uncertainty_notes}` : "");
+    $("r-quality").textContent = qualityText(a);
     $("r-model").textContent = `Analyzed with ${state.analysis.model}. AI output is a draft — please review it.`;
     $("analysis-result").hidden = false;
   }
@@ -270,7 +271,7 @@
     $("urgency-select").value = e.urgency || "uncertain";
     updateCausesWarning();
     const a = state.analysis.analysis;
-    $("quality-note").textContent = `Photo quality: ${a.image_quality}` + (a.uncertainty_notes ? ` — ${a.uncertainty_notes}` : "");
+    $("quality-note").textContent = `Photo quality: ${qualityText(a)}`;
   }
   function updateCausesWarning() {
     const n = ($("causes-input").value || "").split("\n").filter((l) => l.trim()).length;
@@ -399,8 +400,7 @@
         if (marker) map.panTo(marker.getLatLng());
         setKbd("drop");
       } else {
-        const c = map.getCenter();
-        setPin(c.lat, c.lng, "map_click", { keepAddress: true });
+        dropPinAtCenter();
         setKbd("placed");
       }
     });
@@ -451,6 +451,11 @@
     invalidateReport({ immediate: true });
     updateContinue();
     return true;
+  }
+  /** Keyboard Space and the phone "Place pin here" button drop the pin at the crosshair. */
+  function dropPinAtCenter() {
+    const c = map.getCenter();
+    setPin(c.lat, c.lng, "map_click", { keepAddress: true });
   }
   function clearPin() {
     Object.assign(state.loc, { lat: null, lon: null, accuracy: null, source: null, address: null, confirmed: false });
@@ -626,10 +631,7 @@
       invalidateReport({ immediate: true });
       updateContinue();
     });
-    $("mobile-place-btn").addEventListener("click", () => {
-      const c = map.getCenter();
-      setPin(c.lat, c.lng, "map_click", { keepAddress: true });
-    });
+    $("mobile-place-btn").addEventListener("click", dropPinAtCenter);
 
     // Every report field invalidates the previous report immediately.
     $("type-options").addEventListener("change", (e) => {

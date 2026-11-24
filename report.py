@@ -211,14 +211,11 @@ class Report(BaseModel):
 def new_report_id() -> str:
     return str(uuid.uuid4())
 
-
 def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-
 def is_reportable_issue(issue_type: str, issue_detected: bool) -> bool:
     return issue_detected and issue_type not in NON_REPORTABLE_TYPES
-
 
 def suggest_urgency(
     issue_type: str,
@@ -253,12 +250,10 @@ def suggest_urgency(
         + UNMEASURED_NOTE
     )
 
-
 def urgency_reason(level: str, suggested_level: str, suggested_reason: str) -> str:
     if level == suggested_level:
         return suggested_reason
     return f"Set by the user (FixMySanDiego suggested {suggested_level}). {suggested_reason}"
-
 
 def readiness_blocker(
     issue: IssueSection, location: LocationInfo, destination: Optional[str]
@@ -274,13 +269,11 @@ def readiness_blocker(
         return "reporting destination not selected"
     return None
 
-
 def submission_status(
     issue: IssueSection, location: LocationInfo, destination: Optional[str]
 ) -> str:
     """Never returns 'submitted' — the user must submit on the official website."""
     return "draft" if readiness_blocker(issue, location, destination) else "ready_for_manual_submission"
-
 
 def as_lines(value) -> list[str]:
     """Accept a list or newline-separated text; strip bullets and blanks."""
@@ -293,7 +286,6 @@ def as_lines(value) -> list[str]:
         if s:
             out.append(s)
     return out
-
 
 def build_report(
     *,
@@ -364,10 +356,8 @@ def build_report(
                               status=submission_status(issue, location, dest)),
     )
 
-
 def _fmt_list(items: list[str]) -> str:
     return "\n".join(f"  - {x}" for x in items) if items else "  - (none listed)"
-
 
 def _fmt_range(low: Optional[float], high: Optional[float], fmt: str) -> Optional[str]:
     """Defensive formatting: returns None instead of raising on incomplete ranges."""
@@ -377,7 +367,6 @@ def _fmt_range(low: Optional[float], high: Optional[float], fmt: str) -> Optiona
         return f"{format(low, fmt)}–{format(high, fmt)}"
     except (TypeError, ValueError):
         return None
-
 
 def _fmt_coord(loc: LocationInfo) -> str:
     if loc.latitude is None or loc.longitude is None:
@@ -390,20 +379,17 @@ def _fmt_coord(loc: LocationInfo) -> str:
     text += " – confirmed by user" if loc.user_confirmed else " – NOT yet confirmed"
     return text
 
-
 def cost_text(c: CostEstimate) -> str:
     rng = _fmt_range(c.min, c.max, ",.0f")
     if c.status != "preliminary" or rng is None:
         return f"Not enough information to estimate ({c.basis})."
     return f"USD {rng} (preliminary; basis: {c.basis}; source: {c.source_url})"
 
-
 def active_time_text(t: RepairTimeEstimate) -> str:
     rng = _fmt_range(t.active_repair_min_hours, t.active_repair_max_hours, "g")
     if t.status != "preliminary" or rng is None:
         return "unavailable"
     return f"{rng} hours (preliminary; source: {t.source_url})"
-
 
 def report_text(r: Report) -> str:
     """Human-readable report suitable for pasting into an official form."""

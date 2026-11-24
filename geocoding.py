@@ -58,7 +58,7 @@ _PREFIX_RE = re.compile(
 _SPLIT_RE = re.compile(r"\s+(?:at|near)\s+", re.IGNORECASE)
 _HAS_CONTEXT_RE = re.compile(r"san\s+diego|california|\bca\b|\b9[12]\d{3}\b", re.IGNORECASE)
 
-# Shared across all sessions in this process (Streamlit runs one process).
+# Shared across all requests in this process (one uvicorn worker on Render).
 _lock = threading.Lock()
 _state = {"last_request": float("-inf"), "suspended_until": float("-inf")}
 _cache: dict[str, tuple[float, list[Place]]] = {}
@@ -69,10 +69,8 @@ _sleep = time.sleep
 def _normalize(text: str) -> str:
     return " ".join(str(text or "").split())
 
-
 def _with_context(text: str) -> str:
     return text if _HAS_CONTEXT_RE.search(text) else text + CONTEXT_SUFFIX
-
 
 def build_queries(text: str) -> list[str]:
     """Turn a natural-language description into at most two Nominatim queries."""
@@ -91,7 +89,6 @@ def build_queries(text: str) -> list[str]:
             if q2 not in queries:
                 queries.append(q2)
     return queries
-
 
 def parse_results(data) -> list[Place]:
     """Validate untrusted Nominatim JSON; drop anything malformed or outside the area."""
@@ -121,19 +118,16 @@ def parse_results(data) -> list[Place]:
             break
     return out
 
-
 def _cache_get(key: str) -> Optional[list[Place]]:
     hit = _cache.get(key)
     if hit and _clock() - hit[0] < CACHE_TTL_S:
         return hit[1]
     return None
 
-
 def _cache_put(key: str, value: list[Place]) -> None:
     if key not in _cache and len(_cache) >= CACHE_MAX_ENTRIES:
         _cache.pop(next(iter(_cache)))
     _cache[key] = (_clock(), value)
-
 
 def _fetch(query: str, user_agent: str) -> list[Place]:
     params = {
@@ -170,7 +164,6 @@ def _fetch(query: str, user_agent: str) -> list[Place]:
         return parse_results(json.loads(body))
     except (ValueError, TypeError):
         raise GeocodeError("The location search service returned an unreadable response.") from None
-
 
 def search_places(text: str, user_agent: Optional[str] = None) -> list[Place]:
     """Resolve a description to up to five candidate places (possibly none)."""
