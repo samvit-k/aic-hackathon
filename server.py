@@ -135,7 +135,6 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse({"detail": message}, status_code=status)
 
-
 @app.middleware("http")
 async def guard_and_headers(request: Request, call_next):
     length = request.headers.get("content-length")
@@ -148,16 +147,13 @@ async def guard_and_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "geolocation=(self), camera=(self)"
     return response
 
-
 def _client_key(request: Request) -> str:
     # Behind Render's proxy, uvicorn --proxy-headers puts the real client IP here.
     return request.client.host if request.client else "unknown"
 
-
 def _search_enabled() -> bool:
     value = (get_setting("GEOCODER_ENABLED", "true") or "true").strip().lower()
     return value not in ("false", "0", "no", "off")
-
 
 # --------------------------------------------------------------------------- #
 # Pages
@@ -166,11 +162,9 @@ def _search_enabled() -> bool:
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
-
 @app.get("/healthz", include_in_schema=False)
 def healthz() -> dict:
     return {"ok": True}
-
 
 # --------------------------------------------------------------------------- #
 # API
@@ -187,7 +181,6 @@ def config() -> dict:
         "map_center": UCSD_CENTER,
         "demo_coordinate": DEMO_COORD,
     }
-
 
 @app.post("/api/analyze")
 async def analyze(request: Request, photo: UploadFile = File(...)):
@@ -267,7 +260,6 @@ def _friendly(exc: ValidationError) -> str:
         where = ".".join(str(p) for p in err.get("loc", ()) if p not in ("body",))
         parts.append(f"{where}: {err['msg']}" if where else err["msg"])
     return "; ".join(parts)
-
 
 @app.post("/api/report")
 def make_report(body: ReportRequest):

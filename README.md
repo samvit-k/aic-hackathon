@@ -143,13 +143,13 @@ pytest -q        # Python tests + frontend tests (Node.js)
 
 ## Testing
 
-- **Automated:** 112 tests (`pytest -q`).
+- **Automated:** 141 tests (`pytest -q`).
   - **Report rules:** schema rules, the honest cost/time policy, the P0–P3 rule, and that "no damage" can never be "ready".
-  - **Gemini output:** cleanup of the response and photo validation.
+  - **Gemini output:** cleanup of the response, photo validation, and the fallback-model logic (tested against a mocked Gemini SDK).
   - **Place search:** query cleanup, caching, rate limiting, and back-off.
   - **API:** errors, upload limits, log redaction, and the static-files check.
   - **Frontend:** stale-response handling, run with Node's test runner.
-- **End-to-end in Chrome (Playwright):** 32 of 32 checks pass at desktop size and at a 390px phone width, using real Gemini and Nominatim calls. They cover:
+- **End-to-end in Chrome (Playwright, Nov 7, 2026):** 32 of 32 checks passed at desktop size and at a 390px phone width, using real Gemini and Nominatim calls. They cover:
   - search, dragging the pin, Space-to-drop, GPS, and typed coordinates
   - that an edit invalidates the report
   - that copied text, JSON, and the pin all have the same coordinates
@@ -173,7 +173,6 @@ aic-hackathon/
 │   ├── report-sync.js     # Keeps the report in sync with edits
 │   └── logo.svg
 ├── tests/                 # pytest suites + tests/js (Node test runner)
-├── app.py, location.py    # Legacy Streamlit UI (being retired)
 ├── render.yaml            # Render deployment blueprint
 ├── requirements.txt       # Runtime dependencies
 ├── requirements-dev.txt   # + pytest, httpx

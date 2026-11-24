@@ -9,7 +9,6 @@ import hashlib
 import io
 import json
 import os
-import sys
 import warnings
 from dataclasses import dataclass
 from typing import Optional
@@ -53,20 +52,10 @@ Keep the description objective and concise (1-3 sentences)."""
 # Settings / secrets
 # --------------------------------------------------------------------------- #
 def get_setting(name: str, default: Optional[str] = None) -> Optional[str]:
-    """Environment / .env, plus st.secrets when running inside the legacy Streamlit app.
+    """Read a setting from the environment (a local .env is loaded above; Render sets env vars).
 
-    Streamlit is consulted only if it is already loaded, so the FastAPI server never
-    imports it (importing it would install Streamlit's own logging handlers).
+    Blank values count as unset, so `default` is returned for them.
     """
-    st = sys.modules.get("streamlit")
-    if st is not None:
-        try:
-            if name in st.secrets:
-                value = str(st.secrets[name]).strip()
-                if value:
-                    return value
-        except Exception:  # no secrets.toml
-            pass
     value = os.environ.get(name, "").strip()
     return value or default
 
@@ -160,7 +149,6 @@ def _clean_list(items, limit: int) -> list[str]:
             out.append(s[:300])
     return out[:limit]
 
-
 def _clear_findings(a: GeminiAnalysis) -> None:
     """Remove anything that could read as a detected finding."""
     a.issue_detected = False
@@ -168,7 +156,6 @@ def _clear_findings(a: GeminiAnalysis) -> None:
     a.apparent_immediate_danger = False
     a.possible_trip_or_access_obstacle = False
     a.minor_or_cosmetic = False
-
 
 def parse_analysis(raw_text: str) -> GeminiAnalysis:
     """Treat model output as untrusted: parse, trim, validate, and make consistent."""
@@ -201,7 +188,6 @@ def parse_analysis(raw_text: str) -> GeminiAnalysis:
         a.needs_human_review = True
     return a
 
-
 # --------------------------------------------------------------------------- #
 # Gemini call
 # --------------------------------------------------------------------------- #
@@ -210,7 +196,7 @@ def _friendly_api_error(exc: Exception) -> tuple[str, bool]:
     code = getattr(exc, "code", None)
     text = str(exc)
     if code in (401, 403) or (code == 400 and "API key" in text):
-        return "Gemini rejected the API key. Check GEMINI_API_KEY in .env or Streamlit secrets.", False
+        return "Gemini rejected the API key. Check GEMINI_API_KEY in .env or the server's environment variables.", False
     if code == 404:
         return "The configured Gemini model is not available to this API key.", True
     if code == 429:
@@ -218,7 +204,6 @@ def _friendly_api_error(exc: Exception) -> tuple[str, bool]:
     if isinstance(code, int) and code >= 500:
         return "Gemini is busy or timed out. Please try again.", True
     return "Could not reach Gemini (network or timeout). Please try again.", True
-
 
 def analyze_image(
     jpeg_bytes: bytes,
@@ -260,7 +245,6 @@ def analyze_image(
             if not retry:
                 break
     raise AnalysisError(last_message)
-
 
 def configured_models() -> list[str]:
     primary = get_setting("GEMINI_MODEL", DEFAULT_MODEL)
